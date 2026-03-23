@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
     View,
     Text,
@@ -8,11 +8,12 @@ import {
     ScrollView,
     Animated,
     Easing,
-    TextInput,
     Image,
-    Dimensions
+    Alert,
+    ActivityIndicator,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
+import { getCategories, getDishes, createOrder } from '../../api/apiService';
 
 const COLORS = {
     primary: '#ff6b6b',
@@ -23,191 +24,218 @@ const COLORS = {
     white: '#FFFFFF',
     textDark: '#0f172a',
     textMuted: '#94a3b8',
-    slate800: '#1e293b',
-    slate700: '#334155',
     slate100: '#f1f5f9',
 };
 
-const CATEGORIES = ['Популярное', 'Горячее', 'Салаты', 'Напитки', 'Десерты'];
+const CATEGORY_EMOJIS = {
+    'Салаты': '🥗',
+    'Супы': '🍜',
+    'Горячее': '🥩',
+    'Напитки': '🥤',
+    'Десерты': '🍰',
+    'Пицца': '🍕',
+    'Суши': '🍣',
+    'Паста': '🍝',
+    'Все': '📋',
+};
 
-const MENU_ITEMS = [
-    { id: 1, name: 'Стейк Рибай', desc: 'С овощами гриль и соусом пеппер', price: 2400, category: 'Горячее', image: 'https://images.unsplash.com/photo-1594041680534-e8c8cdebd659?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxzZWFyY2h8Mnx8c3RlYWt8ZW58MHx8MHx8fDA%3D' },
-    { id: 2, name: 'Паста Карбонара', desc: 'Классическая итальянская паста с беконом', price: 850, category: 'Горячее', image: 'https://images.unsplash.com/photo-1612874742237-6526221588e3?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxzZWFyY2h8Mnx8Y2FyYm9uYXJhfGVufDB8fDB8fHww' },
-    { id: 3, name: 'Салат Цезарь', desc: 'С куриным филе и перепелиными яйцами', price: 650, category: 'Салаты', image: 'https://images.unsplash.com/photo-1550304943-4f24f54ddde9?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxzZWFyY2h8Mnx8Y2Flc2FyJTIwc2FsYWR8ZW58MHx8MHx8fDA%3D' },
-    { id: 4, name: 'Клубничный мохито', desc: 'Освежающий лимонад со свежей клубникой', price: 450, category: 'Напитки', image: 'https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxzZWFyY2h8NHx8ZHJpbmt8ZW58MHx8MHx8fDA%3D' },
-    { id: 5, name: 'Тирамису', desc: 'Итальянский многослойный десерт', price: 550, category: 'Десерты', image: 'https://images.unsplash.com/photo-1571115177098-24de415b3a4f?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxzZWFyY2h8Mnx8dGlyYW1pc3V8ZW58MHx8MHx8fDA%3D' },
-];
+const formatApiError = (error) => {
+    const data = error?.response?.data;
+    if (!data) {
+        return error?.message || 'Неизвестная ошибка';
+    }
+    if (typeof data === 'string') {
+        return data;
+    }
+    if (data.detail) {
+        return data.detail;
+    }
+    const flatMessages = Object.entries(data).flatMap(([key, value]) => {
+        if (Array.isArray(value)) {
+            return `${key}: ${value.join(', ')}`;
+        }
+        if (value && typeof value === 'object') {
+            return `${key}: ${JSON.stringify(value)}`;
+        }
+        return `${key}: ${String(value)}`;
+    });
+    return flatMessages.join('\n') || error.message || 'Неизвестная ошибка';
+};
 
-export default function OrderCreationScreen({ navigation, route }) {
-    // Expected to receive { tableNumber: 5 }
-    const tableNumber = route?.params?.tableNumber || 5;
+export default function OrderCreationScreen({ route, navigation }) {
+    const { tableNumber, tableId } = route.params;
+    const [categories, setCategories] = useState([{ id: 'all', name: 'Все' }]);
+    const [dishes, setDishes] = useState([]);
+    const [activeCategory, setActiveCategory] = useState('all');
+    const [cart, setCart] = useState({});
+    const [submitting, setSubmitting] = useState(false);
+    const [loading, setLoading] = useState(true);
+    const [menuError, setMenuError] = useState('');
 
-    const [searchQuery, setSearchQuery] = useState('');
-    const [activeCategory, setActiveCategory] = useState('Популярное');
-    const [cart, setCart] = useState([]);
-
-    // Animations
     const fadeAnim = useRef(new Animated.Value(0)).current;
-    const translateY = useRef(new Animated.Value(20)).current;
-
-    // Bottom cart panel animation
-    const cartTranslateY = useRef(new Animated.Value(100)).current;
-
-    const [itemAnims, setItemAnims] = useState([]);
 
     useEffect(() => {
-        // Main Mount Animation
-        Animated.parallel([
-            Animated.timing(fadeAnim, {
-                toValue: 1,
-                duration: 500,
-                useNativeDriver: true,
-            }),
-            Animated.timing(translateY, {
-                toValue: 0,
-                duration: 500,
-                easing: Easing.out(Easing.cubic),
-                useNativeDriver: true,
-            })
-        ]).start();
+        Animated.timing(fadeAnim, {
+            toValue: 1,
+            duration: 500,
+            useNativeDriver: true,
+        }).start();
+        fetchMenu();
     }, []);
 
-    const filteredItems = MENU_ITEMS.filter(item => {
-        const matchesCategory = activeCategory === 'Популярное' ? true : item.category === activeCategory;
-        const matchesQuery = item.name.toLowerCase().includes(searchQuery.toLowerCase());
-        return matchesCategory && matchesQuery;
-    });
+    const fetchMenu = useCallback(async () => {
+        try {
+            setMenuError('');
+            const [catData, dishData] = await Promise.all([
+                getCategories(),
+                getDishes(),
+            ]);
 
-    useEffect(() => {
-        // List mount animation triggers when items change
-        const anims = filteredItems.map(() => ({
-            opacity: new Animated.Value(0),
-            translateY: new Animated.Value(20)
-        }));
-        setItemAnims(anims);
+            const catList = catData.results || catData || [];
+            const dishList = dishData.results || dishData || [];
 
-        if (filteredItems.length > 0) {
-            const animations = anims.map((anim, index) => {
-                return Animated.parallel([
-                    Animated.timing(anim.opacity, {
-                        toValue: 1,
-                        duration: 350,
-                        delay: index * 50,
-                        useNativeDriver: true,
-                        easing: Easing.out(Easing.ease),
-                    }),
-                    Animated.spring(anim.translateY, {
-                        toValue: 0,
-                        friction: 8,
-                        tension: 50,
-                        delay: index * 50,
-                        useNativeDriver: true,
-                    })
-                ]);
-            });
-            Animated.parallel(animations).start();
-        }
-    }, [activeCategory, searchQuery]);
-
-    // Cart Panel Animation Effect
-    useEffect(() => {
-        if (cart.length > 0) {
-            Animated.spring(cartTranslateY, {
-                toValue: 0,
-                friction: 8,
-                tension: 40,
-                useNativeDriver: true,
-            }).start();
-        } else {
-            Animated.timing(cartTranslateY, {
-                toValue: 150,
-                duration: 300,
-                useNativeDriver: true,
-            }).start();
-        }
-    }, [cart.length]);
-
-    const addToCart = (item) => {
-        setCart(prev => {
-            const existing = prev.find(i => i.id === item.id);
-            if (existing) {
-                return prev.map(i => i.id === item.id ? { ...i, qty: i.qty + 1 } : i);
+            if (Array.isArray(catList) && catList.length > 0) {
+                setCategories([{ id: 'all', name: 'Все' }, ...catList]);
             }
-            return [...prev, { ...item, qty: 1 }];
+            setDishes(Array.isArray(dishList) ? dishList : []);
+        } catch (e) {
+            console.log('Menu fetch failed:', e.message);
+            setCategories([{ id: 'all', name: 'Все' }]);
+            setDishes([]);
+            setMenuError('Не удалось загрузить меню');
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
+    const getFilteredDishes = () => {
+        if (activeCategory === 'all') return dishes;
+        return dishes.filter(d => d.category === activeCategory);
+    };
+
+    const addToCart = (dishId) => {
+        setCart(prev => ({
+            ...prev,
+            [dishId]: (prev[dishId] || 0) + 1,
+        }));
+    };
+
+    const removeFromCart = (dishId) => {
+        setCart(prev => {
+            const current = prev[dishId] || 0;
+            if (current <= 1) {
+                const newCart = { ...prev };
+                delete newCart[dishId];
+                return newCart;
+            }
+            return { ...prev, [dishId]: current - 1 };
         });
     };
 
-    const formatCurrency = (val) => {
-        return val.toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ") + " ₽";
+    const getCartTotal = () => {
+        return Object.entries(cart).reduce((sum, [dishId, qty]) => {
+            const dish = dishes.find(d => d.id === dishId);
+            if (dish) {
+                return sum + (parseFloat(dish.price) || 0) * qty;
+            }
+            return sum;
+        }, 0);
     };
 
-    const cartTotal = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
-    const cartCount = cart.reduce((sum, item) => sum + item.qty, 0);
+    const getCartItemCount = () => {
+        return Object.values(cart).reduce((sum, qty) => sum + qty, 0);
+    };
+
+    const formatCurrency = (val) => {
+        return Math.round(val).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ') + ' сум';
+    };
+
+    const handleSubmitOrder = async () => {
+        const itemCount = getCartItemCount();
+        if (itemCount === 0) {
+            Alert.alert('Пустая корзина', 'Добавьте блюда в заказ');
+            return;
+        }
+
+        if (menuError || dishes.length === 0) {
+            Alert.alert('Меню недоступно', 'Сначала загрузите реальные блюда с сервера.');
+            return;
+        }
+
+        setSubmitting(true);
+        try {
+            const items = Object.entries(cart).map(([dishId, quantity]) => ({
+                dish: dishId,
+                quantity: quantity,
+            }));
+
+            const orderResponse = await createOrder(tableId, items);
+
+            navigation.replace('OrderConfirmation', {
+                tableNumber,
+                total: getCartTotal(),
+                items: Object.entries(cart).map(([dishId, qty]) => {
+                    const dish = dishes.find(d => d.id === dishId);
+                    return {
+                        name: dish?.name || 'Блюдо',
+                        quantity: qty,
+                        price: parseFloat(dish?.price || 0),
+                    };
+                }),
+                orderId: orderResponse?.id,
+                orderData: orderResponse,
+            });
+        } catch (e) {
+            console.log('Order creation failed:', e.response?.data || e.message);
+            Alert.alert(
+                'Ошибка',
+                'Не удалось создать заказ: ' + formatApiError(e)
+            );
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    const getEmoji = (name) => {
+        return CATEGORY_EMOJIS[name] || '🍽';
+    };
 
     return (
         <SafeAreaView style={styles.container}>
             {/* Header */}
-            <Animated.View style={[styles.header, { opacity: fadeAnim, transform: [{ translateY }] }]}>
-                <View style={styles.headerLeft}>
-                    <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-                        <MaterialIcons name="arrow-back" size={24} color={COLORS.textDark} />
-                    </TouchableOpacity>
-                    <View>
-                        <Text style={styles.headerTitle}>Новый заказ</Text>
-                        <Text style={styles.tableSubtitle}>Стол {tableNumber}</Text>
-                    </View>
-                </View>
-                <TouchableOpacity style={styles.iconBtn}>
-                    <MaterialIcons name="qr-code-scanner" size={24} color={COLORS.textDark} />
+            <Animated.View style={[styles.header, { opacity: fadeAnim }]}>
+                <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+                    <MaterialIcons name="arrow-back" size={24} color={COLORS.textDark} />
                 </TouchableOpacity>
+                <Text style={styles.headerTitle}>Стол {tableNumber}</Text>
+                <View style={{ width: 40 }} />
             </Animated.View>
 
-            {/* Search Bar */}
-            <Animated.View style={[styles.searchContainer, { opacity: fadeAnim }]}>
-                <View style={styles.searchBox}>
-                    <MaterialIcons name="search" size={22} color={COLORS.slate400} />
-                    <TextInput
-                        style={styles.searchInput}
-                        placeholder="Найти блюдо..."
-                        placeholderTextColor={COLORS.slate400}
-                        value={searchQuery}
-                        onChangeText={setSearchQuery}
-                    />
-                    {searchQuery.length > 0 && (
-                        <TouchableOpacity onPress={() => setSearchQuery('')}>
-                            <MaterialIcons name="close" size={20} color={COLORS.slate400} />
-                        </TouchableOpacity>
-                    )}
-                </View>
-                <TouchableOpacity style={styles.filterBtn}>
-                    <MaterialIcons name="tune" size={22} color={COLORS.white} />
-                </TouchableOpacity>
-            </Animated.View>
-
-            {/* Categories */}
-            <Animated.View style={[styles.categoriesWrapper, { opacity: fadeAnim }]}>
+            {/* Category Pills */}
+            <Animated.View style={[styles.catWrapper, { opacity: fadeAnim }]}>
                 <ScrollView
                     horizontal
                     showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={styles.categoriesContainer}
+                    contentContainerStyle={styles.catContainer}
                 >
-                    {CATEGORIES.map((cat, index) => {
-                        const isActive = activeCategory === cat;
+                    {categories.map((cat) => {
+                        const isActive = activeCategory === cat.id;
                         return (
                             <TouchableOpacity
-                                key={index}
+                                key={cat.id}
                                 activeOpacity={0.7}
-                                onPress={() => setActiveCategory(cat)}
+                                onPress={() => setActiveCategory(cat.id)}
                                 style={[
-                                    styles.categoryPill,
-                                    isActive ? styles.categoryPillActive : styles.categoryPillInactive
+                                    styles.catPill,
+                                    isActive ? styles.catPillActive : styles.catPillInactive,
                                 ]}
                             >
+                                <Text style={styles.catEmoji}>{getEmoji(cat.name)}</Text>
                                 <Text style={[
-                                    styles.categoryText,
-                                    isActive ? styles.categoryTextActive : styles.categoryTextInactive
+                                    styles.catText,
+                                    isActive ? styles.catTextActive : styles.catTextInactive,
                                 ]}>
-                                    {cat}
+                                    {cat.name}
                                 </Text>
                             </TouchableOpacity>
                         );
@@ -215,101 +243,127 @@ export default function OrderCreationScreen({ navigation, route }) {
                 </ScrollView>
             </Animated.View>
 
-            {/* Menu List */}
-            <ScrollView
-                style={styles.mainScroll}
-                contentContainerStyle={[styles.mainScrollContent, { paddingBottom: cart.length > 0 ? 120 : 20 }]}
-                showsVerticalScrollIndicator={false}
-            >
-                {filteredItems.map((item, index) => {
-                    const anim = itemAnims[index] || { opacity: 1, translateY: 0 };
-                    const cartItem = cart.find(c => c.id === item.id);
-                    const qty = cartItem ? cartItem.qty : 0;
+            {/* Dish List */}
+            {loading ? (
+                <View style={styles.loadingContainer}>
+                    <ActivityIndicator size="large" color={COLORS.primary} />
+                </View>
+            ) : menuError ? (
+                <View style={styles.emptyState}>
+                    <MaterialIcons name="wifi-off" size={44} color={COLORS.textMuted} />
+                    <Text style={styles.emptyTitle}>{menuError}</Text>
+                    <Text style={styles.emptySubtitle}>Пока меню не пришло из API, заказ отправлять нельзя.</Text>
+                    <TouchableOpacity style={styles.retryBtn} onPress={fetchMenu}>
+                        <Text style={styles.retryBtnText}>Повторить</Text>
+                    </TouchableOpacity>
+                </View>
+            ) : getFilteredDishes().length === 0 ? (
+                <View style={styles.emptyState}>
+                    <MaterialIcons name="restaurant-menu" size={44} color={COLORS.textMuted} />
+                    <Text style={styles.emptyTitle}>Блюда не найдены</Text>
+                </View>
+            ) : (
+                <ScrollView
+                    style={styles.mainScroll}
+                    contentContainerStyle={styles.mainScrollContent}
+                    showsVerticalScrollIndicator={false}
+                >
+                    {getFilteredDishes().map((dish, index) => {
+                        const qty = cart[dish.id] || 0;
+                        const isUnavailable = dish.is_available === false;
 
-                    return (
-                        <Animated.View
-                            key={item.id}
-                            style={[
-                                styles.menuItemWrapper,
-                                {
-                                    opacity: anim.opacity,
-                                    transform: [{ translateY: anim.translateY }]
-                                }
-                            ]}
-                        >
-                            <TouchableOpacity
-                                style={[styles.menuCard, qty > 0 && styles.menuCardActive]}
-                                activeOpacity={0.8}
-                                onPress={() => addToCart(item)}
+                        return (
+                            <Animated.View
+                                key={dish.id}
+                                style={[
+                                    styles.dishCard,
+                                    isUnavailable && styles.dishCardUnavailable,
+                                    {
+                                        opacity: fadeAnim,
+                                        transform: [{
+                                            translateY: fadeAnim.interpolate({
+                                                inputRange: [0, 1],
+                                                outputRange: [15 + index * 5, 0],
+                                            })
+                                        }],
+                                    },
+                                ]}
                             >
-                                <Image source={{ uri: item.image }} style={styles.menuItemImage} />
-
-                                <View style={styles.menuItemInfo}>
-                                    <View>
-                                        <Text style={styles.menuItemName} numberOfLines={1}>{item.name}</Text>
-                                        <Text style={styles.menuItemDesc} numberOfLines={2}>{item.desc}</Text>
+                                {dish.image ? (
+                                    <Image source={{ uri: dish.image }} style={styles.dishImage} />
+                                ) : (
+                                    <View style={[styles.dishImage, styles.dishImagePlaceholder]}>
+                                        <MaterialIcons name="restaurant" size={28} color={COLORS.textMuted} />
                                     </View>
+                                )}
 
-                                    <View style={styles.menuItemFooter}>
-                                        <Text style={styles.menuItemPrice}>{formatCurrency(item.price)}</Text>
-
-                                        {qty > 0 ? (
-                                            <View style={styles.qtyBadge}>
-                                                <Text style={styles.qtyText}>{qty} шт</Text>
+                                <View style={styles.dishInfo}>
+                                    <Text style={styles.dishName} numberOfLines={1}>{dish.name}</Text>
+                                    {dish.description ? (
+                                        <Text style={styles.dishDesc} numberOfLines={2}>{dish.description}</Text>
+                                    ) : null}
+                                    <View style={styles.dishMeta}>
+                                        <Text style={styles.dishPrice}>{formatCurrency(parseFloat(dish.price))}</Text>
+                                        {dish.cooking_time ? (
+                                            <View style={styles.timeTag}>
+                                                <MaterialIcons name="schedule" size={12} color={COLORS.textMuted} />
+                                                <Text style={styles.timeText}>{dish.cooking_time} мин</Text>
                                             </View>
+                                        ) : null}
+                                    </View>
+                                </View>
+
+                                {isUnavailable ? (
+                                    <View style={styles.unavailableBadge}>
+                                        <Text style={styles.unavailableText}>{dish.unavailable_reason || 'Нет в наличии'}</Text>
+                                    </View>
+                                ) : (
+                                    <View style={styles.qtyControls}>
+                                        {qty > 0 ? (
+                                            <>
+                                                <TouchableOpacity style={styles.qtyBtn} onPress={() => removeFromCart(dish.id)}>
+                                                    <MaterialIcons name="remove" size={18} color={COLORS.primary} />
+                                                </TouchableOpacity>
+                                                <Text style={styles.qtyText}>{qty}</Text>
+                                                <TouchableOpacity style={[styles.qtyBtn, styles.qtyBtnFilled]} onPress={() => addToCart(dish.id)}>
+                                                    <MaterialIcons name="add" size={18} color={COLORS.white} />
+                                                </TouchableOpacity>
+                                            </>
                                         ) : (
-                                            <TouchableOpacity
-                                                style={styles.addBtn}
-                                                onPress={() => addToCart(item)}
-                                            >
-                                                <MaterialIcons name="add" size={20} color={COLORS.primary} />
+                                            <TouchableOpacity style={[styles.qtyBtn, styles.qtyBtnFilled]} onPress={() => addToCart(dish.id)}>
+                                                <MaterialIcons name="add" size={18} color={COLORS.white} />
                                             </TouchableOpacity>
                                         )}
                                     </View>
-                                </View>
-                            </TouchableOpacity>
-                        </Animated.View>
-                    );
-                })}
+                                )}
+                            </Animated.View>
+                        );
+                    })}
+                </ScrollView>
+            )}
 
-                {filteredItems.length === 0 && (
-                    <View style={styles.emptyContainer}>
-                        <MaterialIcons name="search-off" size={48} color={COLORS.slate300} />
-                        <Text style={styles.emptyText}>Ничего не найдено</Text>
-                    </View>
-                )}
-            </ScrollView>
-
-            {/* Floating Cart Panel */}
-            <Animated.View
-                style={[
-                    styles.cartPanel,
-                    { transform: [{ translateY: cartTranslateY }] }
-                ]}
-            >
-                <View style={styles.cartInfo}>
-                    <View style={styles.cartCountBadge}>
-                        <Text style={styles.cartCountText}>{cartCount}</Text>
-                    </View>
-                    <View>
-                        <Text style={styles.cartLabel}>Сумма заказа</Text>
-                        <Text style={styles.cartTotal}>{formatCurrency(cartTotal)}</Text>
-                    </View>
-                </View>
-
+            {/* Cart Bar */}
+            {getCartItemCount() > 0 && (
                 <TouchableOpacity
-                    style={styles.checkoutBtn}
-                    onPress={() => {
-                        // In reality, this would submit the order API request
-                        navigation.navigate('OrderConfirmation', {
-                            orderData: { table: tableNumber, items: cart, total: cartTotal }
-                        });
-                    }}
+                    activeOpacity={0.9}
+                    style={[
+                        styles.cartBar,
+                        (submitting || menuError || dishes.length === 0) && { opacity: 0.7 },
+                    ]}
+                    onPress={handleSubmitOrder}
+                    disabled={submitting || Boolean(menuError) || dishes.length === 0}
                 >
-                    <Text style={styles.checkoutText}>Оформить</Text>
-                    <MaterialIcons name="arrow-forward" size={18} color={COLORS.white} />
+                    <View style={styles.cartBarLeft}>
+                        <View style={styles.cartBadge}>
+                            <Text style={styles.cartBadgeText}>{getCartItemCount()}</Text>
+                        </View>
+                        <Text style={styles.cartBarTitle}>
+                            {submitting ? 'Оформление...' : 'Оформить заказ'}
+                        </Text>
+                    </View>
+                    <Text style={styles.cartBarPrice}>{formatCurrency(getCartTotal())}</Text>
                 </TouchableOpacity>
-            </Animated.View>
+            )}
         </SafeAreaView>
     );
 }
@@ -324,15 +378,8 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'space-between',
         paddingHorizontal: 16,
-        paddingTop: 16,
-        paddingBottom: 12,
-        backgroundColor: 'rgba(248, 245, 245, 0.9)',
-        zIndex: 10,
-    },
-    headerLeft: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 12,
+        paddingVertical: 12,
+        backgroundColor: COLORS.backgroundLight,
     },
     backBtn: {
         width: 40,
@@ -341,108 +388,84 @@ const styles = StyleSheet.create({
         backgroundColor: COLORS.white,
         justifyContent: 'center',
         alignItems: 'center',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
-        shadowRadius: 5,
-        elevation: 2,
     },
     headerTitle: {
-        fontSize: 18,
-        fontWeight: 'bold',
-        color: COLORS.textDark,
-        letterSpacing: -0.5,
-    },
-    tableSubtitle: {
-        fontSize: 13,
-        color: COLORS.primary,
-        fontWeight: '600',
-    },
-    iconBtn: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        backgroundColor: COLORS.white,
-        justifyContent: 'center',
-        alignItems: 'center',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
-        shadowRadius: 5,
-        elevation: 2,
-    },
-    searchContainer: {
-        paddingHorizontal: 16,
-        paddingBottom: 12,
-        flexDirection: 'row',
-        gap: 10,
-    },
-    searchBox: {
-        flex: 1,
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: COLORS.white,
-        borderRadius: 12,
-        paddingHorizontal: 12,
-        height: 48,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.03,
-        shadowRadius: 5,
-        elevation: 1,
-    },
-    searchInput: {
-        flex: 1,
-        height: '100%',
-        marginLeft: 8,
-        fontSize: 15,
+        fontSize: 20,
+        fontWeight: '700',
         color: COLORS.textDark,
     },
-    filterBtn: {
-        width: 48,
-        height: 48,
-        borderRadius: 12,
-        backgroundColor: COLORS.primary,
-        justifyContent: 'center',
-        alignItems: 'center',
-        shadowColor: COLORS.primary,
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 6,
-        elevation: 5,
+    catWrapper: {
+        marginBottom: 4,
     },
-    categoriesWrapper: {
-        marginBottom: 8,
-    },
-    categoriesContainer: {
+    catContainer: {
         paddingHorizontal: 16,
-        paddingBottom: 8,
-        gap: 8,
-    },
-    categoryPill: {
-        paddingHorizontal: 18,
         paddingVertical: 8,
-        borderRadius: 9999,
-        justifyContent: 'center',
+        gap: 10,
+        flexDirection: 'row',
+    },
+    catPill: {
+        flexDirection: 'row',
         alignItems: 'center',
+        paddingHorizontal: 16,
+        paddingVertical: 10,
+        borderRadius: 9999,
+        gap: 6,
     },
-    categoryPillActive: {
-        backgroundColor: COLORS.textDark,
+    catPillActive: {
+        backgroundColor: COLORS.primary,
     },
-    categoryPillInactive: {
+    catPillInactive: {
         backgroundColor: COLORS.white,
         borderWidth: 1,
-        borderColor: COLORS.slate100,
+        borderColor: 'rgba(0,0,0,0.06)',
     },
-    categoryText: {
+    catEmoji: {
+        fontSize: 18,
+    },
+    catText: {
         fontSize: 14,
         fontWeight: '600',
     },
-    categoryTextActive: {
+    catTextActive: {
         color: COLORS.white,
     },
-    categoryTextInactive: {
-        color: COLORS.slate500,
+    catTextInactive: {
+        color: COLORS.textMuted,
+    },
+    loadingContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    emptyState: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        paddingHorizontal: 32,
+        gap: 10,
+    },
+    emptyTitle: {
+        fontSize: 18,
+        fontWeight: '700',
+        color: COLORS.textDark,
+    },
+    emptySubtitle: {
+        fontSize: 14,
+        lineHeight: 20,
+        textAlign: 'center',
+        color: COLORS.textMuted,
+    },
+    retryBtn: {
+        marginTop: 6,
+        paddingHorizontal: 18,
+        paddingVertical: 12,
+        borderRadius: 16,
+        backgroundColor: COLORS.primary,
+    },
+    retryBtnText: {
+        fontSize: 14,
+        fontWeight: '700',
+        color: COLORS.white,
     },
     mainScroll: {
         flex: 1,
@@ -450,148 +473,152 @@ const styles = StyleSheet.create({
     mainScrollContent: {
         paddingHorizontal: 16,
         paddingTop: 8,
+        paddingBottom: 140,
     },
-    menuItemWrapper: {
-        marginBottom: 16,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.05,
-        shadowRadius: 10,
-        elevation: 3,
-    },
-    menuCard: {
-        backgroundColor: COLORS.white,
-        borderRadius: 16,
-        padding: 12,
+    dishCard: {
         flexDirection: 'row',
-        gap: 12,
-        borderWidth: 1,
-        borderColor: 'transparent',
-    },
-    menuCardActive: {
-        borderColor: COLORS.primaryLight,
-        backgroundColor: '#fffdfd',
-    },
-    menuItemImage: {
-        width: 86,
-        height: 86,
-        borderRadius: 12,
-        backgroundColor: COLORS.slate100,
-    },
-    menuItemInfo: {
-        flex: 1,
-        justifyContent: 'space-between',
-    },
-    menuItemName: {
-        fontSize: 16,
-        fontWeight: 'bold',
-        color: COLORS.textDark,
-        marginBottom: 4,
-    },
-    menuItemDesc: {
-        fontSize: 12,
-        color: COLORS.slate500,
-        lineHeight: 16,
-    },
-    menuItemFooter: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
         alignItems: 'center',
-        marginTop: 8,
+        backgroundColor: COLORS.white,
+        borderRadius: 18,
+        padding: 12,
+        marginBottom: 12,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.04,
+        shadowRadius: 8,
+        elevation: 2,
     },
-    menuItemPrice: {
+    dishCardUnavailable: {
+        opacity: 0.5,
+    },
+    dishImage: {
+        width: 72,
+        height: 72,
+        borderRadius: 14,
+    },
+    dishImagePlaceholder: {
+        backgroundColor: COLORS.slate100,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    dishInfo: {
+        flex: 1,
+        marginLeft: 14,
+    },
+    dishName: {
         fontSize: 16,
-        fontWeight: 'bold',
+        fontWeight: '700',
         color: COLORS.textDark,
+        marginBottom: 2,
     },
-    addBtn: {
+    dishDesc: {
+        fontSize: 13,
+        color: COLORS.textMuted,
+        marginBottom: 6,
+        lineHeight: 18,
+    },
+    dishMeta: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+    },
+    dishPrice: {
+        fontSize: 16,
+        fontWeight: '800',
+        color: COLORS.primary,
+    },
+    timeTag: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        backgroundColor: COLORS.slate100,
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+        borderRadius: 8,
+    },
+    timeText: {
+        fontSize: 12,
+        color: COLORS.textMuted,
+        fontWeight: '500',
+    },
+    unavailableBadge: {
+        backgroundColor: 'rgba(238, 90, 111, 0.1)',
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        borderRadius: 10,
+    },
+    unavailableText: {
+        fontSize: 12,
+        color: '#EE5A6F',
+        fontWeight: '600',
+    },
+    qtyControls: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+    },
+    qtyBtn: {
         width: 32,
         height: 32,
-        borderRadius: 16,
+        borderRadius: 10,
         backgroundColor: COLORS.primaryLight,
         justifyContent: 'center',
         alignItems: 'center',
     },
-    qtyBadge: {
+    qtyBtnFilled: {
         backgroundColor: COLORS.primary,
-        paddingHorizontal: 10,
-        paddingVertical: 4,
-        borderRadius: 12,
     },
     qtyText: {
-        color: COLORS.white,
-        fontSize: 12,
-        fontWeight: 'bold',
-    },
-    emptyContainer: {
-        padding: 40,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    emptyText: {
-        marginTop: 12,
         fontSize: 16,
-        color: COLORS.slate400,
-        fontWeight: '500',
+        fontWeight: '700',
+        color: COLORS.textDark,
+        minWidth: 20,
+        textAlign: 'center',
     },
-    cartPanel: {
+    cartBar: {
         position: 'absolute',
-        bottom: 24,
+        bottom: 30,
         left: 16,
         right: 16,
-        backgroundColor: COLORS.textDark,
-        borderRadius: 20,
-        padding: 16,
+        backgroundColor: COLORS.primary,
+        borderRadius: 18,
+        paddingHorizontal: 20,
+        paddingVertical: 18,
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 10 },
-        shadowOpacity: 0.25,
+        shadowColor: COLORS.primary,
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.35,
         shadowRadius: 15,
         elevation: 10,
-        zIndex: 50,
     },
-    cartInfo: {
+    cartBarLeft: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: 12,
     },
-    cartCountBadge: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        backgroundColor: 'rgba(255,255,255,0.15)',
+    cartBadge: {
+        width: 28,
+        height: 28,
+        borderRadius: 10,
+        backgroundColor: 'rgba(255,255,255,0.25)',
         justifyContent: 'center',
         alignItems: 'center',
     },
-    cartCountText: {
+    cartBadgeText: {
+        fontSize: 14,
+        fontWeight: '800',
         color: COLORS.white,
-        fontSize: 18,
-        fontWeight: 'bold',
     },
-    cartLabel: {
-        color: 'rgba(255,255,255,0.7)',
-        fontSize: 12,
-        marginBottom: 2,
-    },
-    cartTotal: {
+    cartBarTitle: {
+        fontSize: 16,
+        fontWeight: '700',
         color: COLORS.white,
-        fontSize: 18,
-        fontWeight: 'bold',
     },
-    checkoutBtn: {
-        backgroundColor: COLORS.primary,
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 6,
-        paddingHorizontal: 20,
-        paddingVertical: 12,
-        borderRadius: 14,
-    },
-    checkoutText: {
+    cartBarPrice: {
+        fontSize: 17,
+        fontWeight: '800',
         color: COLORS.white,
-        fontSize: 15,
-        fontWeight: 'bold',
-    }
+    },
 });

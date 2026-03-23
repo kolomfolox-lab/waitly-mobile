@@ -1,0 +1,4327 @@
+openapi: 3.0.3
+info:
+  title: Waitly API
+  version: 1.0.0
+  description: Restaurant Management SaaS Platform
+paths:
+  /api/:
+    get:
+      operationId: api_retrieve
+      description: API root endpoint
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          description: No response body
+  /api/admin/auth/me/:
+    get:
+      operationId: api_admin_auth_me_retrieve
+      description: Get current authenticated user info.
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/admin/reports/super/:
+    get:
+      operationId: api_admin_reports_super_retrieve
+      description: Export super admin stats to XLSX.
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/admin/stats/chain/{chain_id}/:
+    get:
+      operationId: api_admin_stats_chain_retrieve
+      description: REST API endpoint for chain stats.
+      parameters:
+      - in: path
+        name: chain_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/admin/stats/super/:
+    get:
+      operationId: api_admin_stats_super_retrieve
+      description: REST API endpoint for super admin stats.
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/analytics/analytics/:
+    get:
+      operationId: api_analytics_analytics_list
+      description: Analytics viewing (read-only).
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedDailyAnalyticsList'
+          description: ''
+  /api/analytics/analytics/{id}/:
+    get:
+      operationId: api_analytics_analytics_retrieve
+      description: Analytics viewing (read-only).
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this Daily Analytics.
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DailyAnalytics'
+          description: ''
+  /api/analytics/analytics/by_restaurant/:
+    get:
+      operationId: api_analytics_analytics_by_restaurant_retrieve
+      description: Get analytics grouped by restaurant (super admin only).
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DailyAnalytics'
+          description: ''
+  /api/analytics/analytics/summary/:
+    get:
+      operationId: api_analytics_analytics_summary_retrieve
+      description: Get summary statistics.
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DailyAnalytics'
+          description: ''
+  /api/analytics/analytics/top_dishes/:
+    get:
+      operationId: api_analytics_analytics_top_dishes_retrieve
+      description: Get top dishes across all days.
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DailyAnalytics'
+          description: ''
+  /api/auth/login/:
+    post:
+      operationId: api_auth_login_create
+      description: |-
+        Login with phone number and password.
+        Returns JWT tokens.
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          description: No response body
+  /api/auth/logout/:
+    post:
+      operationId: api_auth_logout_create
+      description: Logout user - blacklist token if using blacklist.
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          description: No response body
+  /api/auth/update_fcm_token/:
+    post:
+      operationId: api_auth_update_fcm_token_create
+      description: Update user's FCM token for push notifications.
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/auth/users/:
+    get:
+      operationId: api_auth_users_list
+      description: User CRUD operations.
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedUserList'
+          description: ''
+    post:
+      operationId: api_auth_users_create
+      description: User CRUD operations.
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserCreate'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/UserCreate'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/UserCreate'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserCreate'
+          description: ''
+  /api/auth/users/{id}/:
+    get:
+      operationId: api_auth_users_retrieve
+      description: User CRUD operations.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this User.
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+          description: ''
+    put:
+      operationId: api_auth_users_update
+      description: User CRUD operations.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this User.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/User'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/User'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/User'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+          description: ''
+    patch:
+      operationId: api_auth_users_partial_update
+      description: User CRUD operations.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this User.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedUser'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedUser'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedUser'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+          description: ''
+    delete:
+      operationId: api_auth_users_destroy
+      description: User CRUD operations.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this User.
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/auth/users/me/:
+    get:
+      operationId: api_auth_users_me_retrieve
+      description: Get current user info.
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+          description: ''
+  /api/menu/categories/:
+    get:
+      operationId: api_menu_categories_list
+      description: Menu category management.
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedMenuCategoryList'
+          description: ''
+    post:
+      operationId: api_menu_categories_create
+      description: Menu category management.
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MenuCategory'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/MenuCategory'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/MenuCategory'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MenuCategory'
+          description: ''
+  /api/menu/categories/{id}/:
+    get:
+      operationId: api_menu_categories_retrieve
+      description: Menu category management.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this Menu Category.
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MenuCategory'
+          description: ''
+    put:
+      operationId: api_menu_categories_update
+      description: Menu category management.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this Menu Category.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MenuCategory'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/MenuCategory'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/MenuCategory'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MenuCategory'
+          description: ''
+    patch:
+      operationId: api_menu_categories_partial_update
+      description: Menu category management.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this Menu Category.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedMenuCategory'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedMenuCategory'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedMenuCategory'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MenuCategory'
+          description: ''
+    delete:
+      operationId: api_menu_categories_destroy
+      description: Menu category management.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this Menu Category.
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/menu/dishes/:
+    get:
+      operationId: api_menu_dishes_list
+      description: Dish management.
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedDishList'
+          description: ''
+    post:
+      operationId: api_menu_dishes_create
+      description: Dish management.
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DishCreateUpdate'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/DishCreateUpdate'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/DishCreateUpdate'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DishCreateUpdate'
+          description: ''
+  /api/menu/dishes/{id}/:
+    get:
+      operationId: api_menu_dishes_retrieve
+      description: Dish management.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this Dish.
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Dish'
+          description: ''
+    put:
+      operationId: api_menu_dishes_update
+      description: Dish management.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this Dish.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DishCreateUpdate'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/DishCreateUpdate'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/DishCreateUpdate'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DishCreateUpdate'
+          description: ''
+    patch:
+      operationId: api_menu_dishes_partial_update
+      description: Dish management.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this Dish.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedDishCreateUpdate'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedDishCreateUpdate'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedDishCreateUpdate'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DishCreateUpdate'
+          description: ''
+    delete:
+      operationId: api_menu_dishes_destroy
+      description: Dish management.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this Dish.
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/menu/dishes/{id}/toggle_availability/:
+    post:
+      operationId: api_menu_dishes_toggle_availability_create
+      description: Toggle dish availability.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this Dish.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Dish'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Dish'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Dish'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Dish'
+          description: ''
+  /api/menu/dishes/by_category/:
+    get:
+      operationId: api_menu_dishes_by_category_retrieve
+      description: Get dishes grouped by category.
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Dish'
+          description: ''
+  /api/orders/orders/:
+    get:
+      operationId: api_orders_orders_list
+      description: Order management.
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedOrderList'
+          description: ''
+    post:
+      operationId: api_orders_orders_create
+      description: Create new order.
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrderCreate'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/OrderCreate'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/OrderCreate'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderCreate'
+          description: ''
+  /api/orders/orders/{id}/:
+    get:
+      operationId: api_orders_orders_retrieve
+      description: Order management.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this Order.
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+          description: ''
+    put:
+      operationId: api_orders_orders_update
+      description: Order management.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this Order.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Order'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Order'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Order'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+          description: ''
+    patch:
+      operationId: api_orders_orders_partial_update
+      description: Order management.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this Order.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedOrder'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedOrder'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedOrder'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+          description: ''
+    delete:
+      operationId: api_orders_orders_destroy
+      description: Order management.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this Order.
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/orders/orders/{id}/accept/:
+    post:
+      operationId: api_orders_orders_accept_create
+      description: Accept order (cook).
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this Order.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Order'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Order'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Order'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+          description: ''
+  /api/orders/orders/{id}/add_delay/:
+    post:
+      operationId: api_orders_orders_add_delay_create
+      description: Add delay time with AI-generated apology.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this Order.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Order'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Order'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Order'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+          description: ''
+  /api/orders/orders/{id}/deliver/:
+    post:
+      operationId: api_orders_orders_deliver_create
+      description: Mark order as delivered.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this Order.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Order'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Order'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Order'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+          description: ''
+  /api/orders/orders/{id}/ready/:
+    post:
+      operationId: api_orders_orders_ready_create
+      description: Mark order as ready.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this Order.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Order'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Order'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Order'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+          description: ''
+  /api/orders/shifts/:
+    get:
+      operationId: api_orders_shifts_list
+      description: Work shift management.
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedWorkShiftList'
+          description: ''
+    post:
+      operationId: api_orders_shifts_create
+      description: Work shift management.
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WorkShift'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/WorkShift'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/WorkShift'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkShift'
+          description: ''
+  /api/orders/shifts/{id}/:
+    get:
+      operationId: api_orders_shifts_retrieve
+      description: Work shift management.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this Work Shift.
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkShift'
+          description: ''
+    put:
+      operationId: api_orders_shifts_update
+      description: Work shift management.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this Work Shift.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WorkShift'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/WorkShift'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/WorkShift'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkShift'
+          description: ''
+    patch:
+      operationId: api_orders_shifts_partial_update
+      description: Work shift management.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this Work Shift.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedWorkShift'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedWorkShift'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedWorkShift'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkShift'
+          description: ''
+    delete:
+      operationId: api_orders_shifts_destroy
+      description: Work shift management.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this Work Shift.
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/orders/shifts/{id}/end/:
+    post:
+      operationId: api_orders_shifts_end_create
+      description: End a shift.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this Work Shift.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WorkShift'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/WorkShift'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/WorkShift'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkShift'
+          description: ''
+  /api/orders/shifts/start/:
+    post:
+      operationId: api_orders_shifts_start_create
+      description: Start a new shift.
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WorkShift'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/WorkShift'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/WorkShift'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkShift'
+          description: ''
+  /api/restaurants/chains/:
+    get:
+      operationId: api_restaurants_chains_list
+      description: ViewSet for managing restaurant chains.
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedRestaurantChainList'
+          description: ''
+    post:
+      operationId: api_restaurants_chains_create
+      description: ViewSet for managing restaurant chains.
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChainCreate'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ChainCreate'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ChainCreate'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChainCreate'
+          description: ''
+  /api/restaurants/chains/{id}/:
+    get:
+      operationId: api_restaurants_chains_retrieve
+      description: ViewSet for managing restaurant chains.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this Restaurant Chain.
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RestaurantChain'
+          description: ''
+    put:
+      operationId: api_restaurants_chains_update
+      description: ViewSet for managing restaurant chains.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this Restaurant Chain.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RestaurantChain'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/RestaurantChain'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/RestaurantChain'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RestaurantChain'
+          description: ''
+    patch:
+      operationId: api_restaurants_chains_partial_update
+      description: ViewSet for managing restaurant chains.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this Restaurant Chain.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedRestaurantChain'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedRestaurantChain'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedRestaurantChain'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RestaurantChain'
+          description: ''
+    delete:
+      operationId: api_restaurants_chains_destroy
+      description: ViewSet for managing restaurant chains.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this Restaurant Chain.
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/restaurants/chains/{id}/extend_subscription/:
+    post:
+      operationId: api_restaurants_chains_extend_subscription_create
+      description: Extend subscription for all restaurants in chain.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this Restaurant Chain.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RestaurantChain'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/RestaurantChain'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/RestaurantChain'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RestaurantChain'
+          description: ''
+  /api/restaurants/restaurants/:
+    get:
+      operationId: api_restaurants_restaurants_list
+      description: ViewSet for managing restaurants.
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedRestaurantList'
+          description: ''
+    post:
+      operationId: api_restaurants_restaurants_create
+      description: ViewSet for managing restaurants.
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RestaurantCreate'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/RestaurantCreate'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/RestaurantCreate'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RestaurantCreate'
+          description: ''
+  /api/restaurants/restaurants/{id}/:
+    get:
+      operationId: api_restaurants_restaurants_retrieve
+      description: ViewSet for managing restaurants.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this Restaurant.
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Restaurant'
+          description: ''
+    put:
+      operationId: api_restaurants_restaurants_update
+      description: ViewSet for managing restaurants.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this Restaurant.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Restaurant'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Restaurant'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Restaurant'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Restaurant'
+          description: ''
+    patch:
+      operationId: api_restaurants_restaurants_partial_update
+      description: ViewSet for managing restaurants.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this Restaurant.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedRestaurant'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedRestaurant'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedRestaurant'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Restaurant'
+          description: ''
+    delete:
+      operationId: api_restaurants_restaurants_destroy
+      description: ViewSet for managing restaurants.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this Restaurant.
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/restaurants/restaurants/{id}/extend_subscription/:
+    post:
+      operationId: api_restaurants_restaurants_extend_subscription_create
+      description: Extend subscription for restaurant.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this Restaurant.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Restaurant'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Restaurant'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Restaurant'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Restaurant'
+          description: ''
+  /api/restaurants/restaurants/{id}/regenerate_kitchen_token/:
+    post:
+      operationId: api_restaurants_restaurants_regenerate_kitchen_token_create
+      description: Regenerate kitchen access token.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this Restaurant.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Restaurant'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Restaurant'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Restaurant'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Restaurant'
+          description: ''
+  /api/reviews/reviews/:
+    get:
+      operationId: api_reviews_reviews_list
+      description: Review management.
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedReviewList'
+          description: ''
+    post:
+      operationId: api_reviews_reviews_create
+      description: Review management.
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReviewCreate'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ReviewCreate'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ReviewCreate'
+        required: true
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReviewCreate'
+          description: ''
+  /api/reviews/reviews/{id}/:
+    get:
+      operationId: api_reviews_reviews_retrieve
+      description: Review management.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this Review.
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Review'
+          description: ''
+    put:
+      operationId: api_reviews_reviews_update
+      description: Review management.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this Review.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Review'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Review'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Review'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Review'
+          description: ''
+    patch:
+      operationId: api_reviews_reviews_partial_update
+      description: Review management.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this Review.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedReview'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedReview'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedReview'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Review'
+          description: ''
+    delete:
+      operationId: api_reviews_reviews_destroy
+      description: Review management.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this Review.
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/reviews/reviews/for_owner/:
+    get:
+      operationId: api_reviews_reviews_for_owner_retrieve
+      description: Get reviews with owner feedback.
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Review'
+          description: ''
+  /api/reviews/reviews/for_superadmin/:
+    get:
+      operationId: api_reviews_reviews_for_superadmin_retrieve
+      description: Get reviews with super admin feedback.
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Review'
+          description: ''
+  /api/reviews/reviews/stats/:
+    get:
+      operationId: api_reviews_reviews_stats_retrieve
+      description: Get review statistics.
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Review'
+          description: ''
+  /api/subscriptions/keys/:
+    get:
+      operationId: api_subscriptions_keys_list
+      description: Subscription key management.
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedSubscriptionKeyList'
+          description: ''
+    post:
+      operationId: api_subscriptions_keys_create
+      description: Only super admins can create keys.
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubscriptionKey'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/SubscriptionKey'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/SubscriptionKey'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubscriptionKey'
+          description: ''
+  /api/subscriptions/keys/{id}/:
+    get:
+      operationId: api_subscriptions_keys_retrieve
+      description: Subscription key management.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this Subscription Key.
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubscriptionKey'
+          description: ''
+    put:
+      operationId: api_subscriptions_keys_update
+      description: Subscription key management.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this Subscription Key.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubscriptionKey'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/SubscriptionKey'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/SubscriptionKey'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubscriptionKey'
+          description: ''
+    patch:
+      operationId: api_subscriptions_keys_partial_update
+      description: Subscription key management.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this Subscription Key.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedSubscriptionKey'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedSubscriptionKey'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedSubscriptionKey'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubscriptionKey'
+          description: ''
+    delete:
+      operationId: api_subscriptions_keys_destroy
+      description: Subscription key management.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this Subscription Key.
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/subscriptions/keys/activate/:
+    post:
+      operationId: api_subscriptions_keys_activate_create
+      description: Activate a subscription key for a restaurant.
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubscriptionKey'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/SubscriptionKey'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/SubscriptionKey'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubscriptionKey'
+          description: ''
+  /api/tables/bookings/:
+    get:
+      operationId: api_tables_bookings_list
+      description: Booking management.
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedBookingList'
+          description: ''
+    post:
+      operationId: api_tables_bookings_create
+      description: Booking management.
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BookingCreate'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/BookingCreate'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/BookingCreate'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BookingCreate'
+          description: ''
+  /api/tables/bookings/{id}/:
+    get:
+      operationId: api_tables_bookings_retrieve
+      description: Booking management.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this Booking.
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Booking'
+          description: ''
+    put:
+      operationId: api_tables_bookings_update
+      description: Booking management.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this Booking.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Booking'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Booking'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Booking'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Booking'
+          description: ''
+    patch:
+      operationId: api_tables_bookings_partial_update
+      description: Booking management.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this Booking.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedBooking'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedBooking'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedBooking'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Booking'
+          description: ''
+    delete:
+      operationId: api_tables_bookings_destroy
+      description: Booking management.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this Booking.
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/tables/bookings/today/:
+    get:
+      operationId: api_tables_bookings_today_retrieve
+      description: Get today's bookings.
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Booking'
+          description: ''
+  /api/tables/tables/:
+    get:
+      operationId: api_tables_tables_list
+      description: Table management.
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedTableList'
+          description: ''
+    post:
+      operationId: api_tables_tables_create
+      description: Table management.
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Table'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Table'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Table'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Table'
+          description: ''
+  /api/tables/tables/{id}/:
+    get:
+      operationId: api_tables_tables_retrieve
+      description: Table management.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this Table.
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Table'
+          description: ''
+    put:
+      operationId: api_tables_tables_update
+      description: Table management.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this Table.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Table'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Table'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Table'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Table'
+          description: ''
+    patch:
+      operationId: api_tables_tables_partial_update
+      description: Table management.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this Table.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedTable'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedTable'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedTable'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Table'
+          description: ''
+    delete:
+      operationId: api_tables_tables_destroy
+      description: Table management.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this Table.
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/tables/tables/{id}/assign_waiter/:
+    post:
+      operationId: api_tables_tables_assign_waiter_create
+      description: Assign waiter to table.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this Table.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Table'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Table'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Table'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Table'
+          description: ''
+  /api/tables/tables/{id}/call_waiter/:
+    post:
+      operationId: api_tables_tables_call_waiter_create
+      description: Guest calls waiter from QR view.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this Table.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Table'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Table'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Table'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Table'
+          description: ''
+components:
+  schemas:
+    Booking:
+      type: object
+      description: Booking serializer.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        table:
+          type: string
+          format: uuid
+        table_number:
+          type: string
+          readOnly: true
+        booking_date:
+          type: string
+          format: date
+        booking_time:
+          type: string
+          format: time
+        guest_count:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+        client_phone:
+          type: string
+          maxLength: 20
+        client_telegram:
+          type: string
+          nullable: true
+          maxLength: 100
+        created_by:
+          type: integer
+          nullable: true
+        created_by_name:
+          type: string
+          readOnly: true
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - booking_date
+      - booking_time
+      - client_phone
+      - created_at
+      - created_by_name
+      - guest_count
+      - id
+      - table
+      - table_number
+      - updated_at
+    BookingCreate:
+      type: object
+      description: Booking creation serializer.
+      properties:
+        table:
+          type: string
+          format: uuid
+        booking_date:
+          type: string
+          format: date
+        booking_time:
+          type: string
+          format: time
+        guest_count:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+        client_phone:
+          type: string
+          maxLength: 20
+        client_telegram:
+          type: string
+          nullable: true
+          maxLength: 100
+      required:
+      - booking_date
+      - booking_time
+      - client_phone
+      - guest_count
+      - table
+    ChainCreate:
+      type: object
+      description: Chain creation serializer.
+      properties:
+        name:
+          type: string
+          maxLength: 255
+        subdomain:
+          type: string
+          maxLength: 100
+          pattern: ^[-a-zA-Z0-9_]+$
+        owner_email:
+          type: string
+          format: email
+          writeOnly: true
+        owner_phone:
+          type: string
+          writeOnly: true
+        owner_password:
+          type: string
+          writeOnly: true
+          minLength: 6
+        owner_first_name:
+          type: string
+          writeOnly: true
+        owner_last_name:
+          type: string
+          writeOnly: true
+      required:
+      - name
+      - owner_email
+      - owner_password
+      - owner_phone
+      - subdomain
+    DailyAnalytics:
+      type: object
+      description: Daily analytics serializer.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        restaurant:
+          type: string
+          format: uuid
+        restaurant_name:
+          type: string
+          readOnly: true
+        date:
+          type: string
+          format: date
+        orders_count:
+          type: integer
+          readOnly: true
+        total_revenue:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+          readOnly: true
+        time_saved_minutes:
+          type: integer
+          readOnly: true
+          description: Calculated as orders_count * 3
+        top_dishes:
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - created_at
+      - date
+      - id
+      - orders_count
+      - restaurant
+      - restaurant_name
+      - time_saved_minutes
+      - top_dishes
+      - total_revenue
+      - updated_at
+    Dish:
+      type: object
+      description: Dish serializer.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        restaurant:
+          type: string
+          format: uuid
+        category:
+          type: string
+          format: uuid
+          nullable: true
+        category_name:
+          type: string
+          readOnly: true
+        name:
+          type: string
+          maxLength: 200
+        name_uz:
+          type: string
+          maxLength: 200
+        name_en:
+          type: string
+          maxLength: 200
+        description:
+          type: string
+        description_uz:
+          type: string
+        description_en:
+          type: string
+        price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+        image:
+          type: string
+          format: uri
+          nullable: true
+        cooking_time:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+          description: Estimated cooking time in minutes
+        is_available:
+          type: boolean
+        unavailable_reason:
+          type: string
+          description: Reason for unavailability (e.g., "No products")
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - category_name
+      - created_at
+      - id
+      - name
+      - price
+      - restaurant
+      - updated_at
+    DishCreateUpdate:
+      type: object
+      description: Dish create/update serializer.
+      properties:
+        restaurant:
+          type: string
+          format: uuid
+        category:
+          type: string
+          format: uuid
+          nullable: true
+        name:
+          type: string
+          maxLength: 200
+        name_uz:
+          type: string
+          maxLength: 200
+        name_en:
+          type: string
+          maxLength: 200
+        description:
+          type: string
+        description_uz:
+          type: string
+        description_en:
+          type: string
+        price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+        image:
+          type: string
+          format: uri
+          nullable: true
+        cooking_time:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+          description: Estimated cooking time in minutes
+        is_available:
+          type: boolean
+        unavailable_reason:
+          type: string
+          description: Reason for unavailability (e.g., "No products")
+      required:
+      - name
+      - price
+      - restaurant
+    DurationMonthsEnum:
+      enum:
+      - 1
+      - 3
+      - 6
+      - 12
+      - 24
+      type: integer
+      description: |-
+        * `1` - 1 Month
+        * `3` - 3 Months
+        * `6` - 6 Months
+        * `12` - 12 Months
+        * `24` - 24 Months
+    MenuCategory:
+      type: object
+      description: Menu category serializer.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        restaurant:
+          type: string
+          format: uuid
+        name:
+          type: string
+          maxLength: 100
+        name_uz:
+          type: string
+          maxLength: 100
+        name_en:
+          type: string
+          maxLength: 100
+        order:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+          description: Display order
+        dishes_count:
+          type: string
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - created_at
+      - dishes_count
+      - id
+      - name
+      - restaurant
+    Order:
+      type: object
+      description: Order serializer.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        restaurant:
+          type: string
+          format: uuid
+        table:
+          type: string
+          format: uuid
+        table_number:
+          type: string
+          readOnly: true
+        waiter:
+          type: integer
+          nullable: true
+        waiter_name:
+          type: string
+          readOnly: true
+        cook:
+          type: integer
+          nullable: true
+        shift:
+          type: string
+          format: uuid
+          nullable: true
+        status:
+          $ref: '#/components/schemas/StatusEnum'
+        estimated_time:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+          description: Estimated cooking time in minutes
+        extra_time:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+          description: Additional delay time in minutes
+        delay_message:
+          type: string
+          readOnly: true
+          description: AI-generated apology message for delay
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderItem'
+          readOnly: true
+        total_amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        accepted_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        ready_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        delivered_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+      required:
+      - accepted_at
+      - created_at
+      - delay_message
+      - delivered_at
+      - id
+      - items
+      - ready_at
+      - restaurant
+      - table
+      - table_number
+      - total_amount
+      - waiter_name
+    OrderCreate:
+      type: object
+      description: Create order serializer.
+      properties:
+        table_id:
+          type: string
+          format: uuid
+        items:
+          type: array
+          items:
+            type: object
+            additionalProperties:
+              type: string
+      required:
+      - items
+      - table_id
+    OrderItem:
+      type: object
+      description: Order item serializer.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        dish:
+          type: string
+          format: uuid
+        dish_name:
+          type: string
+          readOnly: true
+        quantity:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+        price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+          readOnly: true
+          description: Price at time of order
+        notes:
+          type: string
+          description: Special instructions (e.g., "No cheese")
+      required:
+      - dish
+      - dish_name
+      - id
+      - price
+    PaginatedBookingList:
+      type: object
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Booking'
+    PaginatedDailyAnalyticsList:
+      type: object
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/DailyAnalytics'
+    PaginatedDishList:
+      type: object
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Dish'
+    PaginatedMenuCategoryList:
+      type: object
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/MenuCategory'
+    PaginatedOrderList:
+      type: object
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Order'
+    PaginatedRestaurantChainList:
+      type: object
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/RestaurantChain'
+    PaginatedRestaurantList:
+      type: object
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Restaurant'
+    PaginatedReviewList:
+      type: object
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Review'
+    PaginatedSubscriptionKeyList:
+      type: object
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/SubscriptionKey'
+    PaginatedTableList:
+      type: object
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Table'
+    PaginatedUserList:
+      type: object
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/User'
+    PaginatedWorkShiftList:
+      type: object
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/WorkShift'
+    PatchedBooking:
+      type: object
+      description: Booking serializer.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        table:
+          type: string
+          format: uuid
+        table_number:
+          type: string
+          readOnly: true
+        booking_date:
+          type: string
+          format: date
+        booking_time:
+          type: string
+          format: time
+        guest_count:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+        client_phone:
+          type: string
+          maxLength: 20
+        client_telegram:
+          type: string
+          nullable: true
+          maxLength: 100
+        created_by:
+          type: integer
+          nullable: true
+        created_by_name:
+          type: string
+          readOnly: true
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+    PatchedDishCreateUpdate:
+      type: object
+      description: Dish create/update serializer.
+      properties:
+        restaurant:
+          type: string
+          format: uuid
+        category:
+          type: string
+          format: uuid
+          nullable: true
+        name:
+          type: string
+          maxLength: 200
+        name_uz:
+          type: string
+          maxLength: 200
+        name_en:
+          type: string
+          maxLength: 200
+        description:
+          type: string
+        description_uz:
+          type: string
+        description_en:
+          type: string
+        price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+        image:
+          type: string
+          format: uri
+          nullable: true
+        cooking_time:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+          description: Estimated cooking time in minutes
+        is_available:
+          type: boolean
+        unavailable_reason:
+          type: string
+          description: Reason for unavailability (e.g., "No products")
+    PatchedMenuCategory:
+      type: object
+      description: Menu category serializer.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        restaurant:
+          type: string
+          format: uuid
+        name:
+          type: string
+          maxLength: 100
+        name_uz:
+          type: string
+          maxLength: 100
+        name_en:
+          type: string
+          maxLength: 100
+        order:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+          description: Display order
+        dishes_count:
+          type: string
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+    PatchedOrder:
+      type: object
+      description: Order serializer.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        restaurant:
+          type: string
+          format: uuid
+        table:
+          type: string
+          format: uuid
+        table_number:
+          type: string
+          readOnly: true
+        waiter:
+          type: integer
+          nullable: true
+        waiter_name:
+          type: string
+          readOnly: true
+        cook:
+          type: integer
+          nullable: true
+        shift:
+          type: string
+          format: uuid
+          nullable: true
+        status:
+          $ref: '#/components/schemas/StatusEnum'
+        estimated_time:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+          description: Estimated cooking time in minutes
+        extra_time:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+          description: Additional delay time in minutes
+        delay_message:
+          type: string
+          readOnly: true
+          description: AI-generated apology message for delay
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderItem'
+          readOnly: true
+        total_amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        accepted_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        ready_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        delivered_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+    PatchedRestaurant:
+      type: object
+      description: Restaurant serializer.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        name:
+          type: string
+          maxLength: 255
+        slug:
+          type: string
+          maxLength: 100
+          pattern: ^[-a-zA-Z0-9_]+$
+        chain:
+          type: string
+          format: uuid
+          nullable: true
+        chain_name:
+          type: string
+          readOnly: true
+        subdomain:
+          type: string
+          nullable: true
+          maxLength: 100
+          pattern: ^[-a-zA-Z0-9_]+$
+        owner:
+          type: integer
+        owner_name:
+          type: string
+          readOnly: true
+        subscription_active:
+          type: boolean
+        subscription_expires_at:
+          type: string
+          format: date-time
+          nullable: true
+        subscription_status:
+          type: string
+          readOnly: true
+        kitchen_token:
+          type: string
+          readOnly: true
+        full_url:
+          type: string
+          readOnly: true
+        kitchen_url:
+          type: string
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+    PatchedRestaurantChain:
+      type: object
+      description: Restaurant chain serializer.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        name:
+          type: string
+          maxLength: 255
+        subdomain:
+          type: string
+          maxLength: 100
+          pattern: ^[-a-zA-Z0-9_]+$
+        owner:
+          type: integer
+        owner_name:
+          type: string
+          readOnly: true
+        restaurants_count:
+          type: string
+          readOnly: true
+        subscription_status:
+          type: string
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+    PatchedReview:
+      type: object
+      description: Review serializer.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        order:
+          type: string
+          format: uuid
+        restaurant:
+          type: string
+          format: uuid
+        rating_food:
+          allOf:
+          - $ref: '#/components/schemas/RatingFoodEnum'
+          description: |-
+            Food quality rating
+
+            * `1` - 1
+            * `2` - 2
+            * `3` - 3
+            * `4` - 4
+            * `5` - 5
+          minimum: -9223372036854775808
+          maximum: 9223372036854775807
+        rating_service_speed:
+          allOf:
+          - $ref: '#/components/schemas/RatingServiceSpeedEnum'
+          description: |-
+            Service speed rating
+
+            * `1` - 1
+            * `2` - 2
+            * `3` - 3
+            * `4` - 4
+            * `5` - 5
+          minimum: -9223372036854775808
+          maximum: 9223372036854775807
+        rating_waiter:
+          allOf:
+          - $ref: '#/components/schemas/RatingWaiterEnum'
+          description: |-
+            Waiter performance rating
+
+            * `1` - 1
+            * `2` - 2
+            * `3` - 3
+            * `4` - 4
+            * `5` - 5
+          minimum: -9223372036854775808
+          maximum: 9223372036854775807
+        rating_waitly:
+          allOf:
+          - $ref: '#/components/schemas/RatingWaitlyEnum'
+          description: |-
+            Waitly service rating
+
+            * `1` - 1
+            * `2` - 2
+            * `3` - 3
+            * `4` - 4
+            * `5` - 5
+          minimum: -9223372036854775808
+          maximum: 9223372036854775807
+        average_rating:
+          type: number
+          format: double
+          readOnly: true
+        comment:
+          type: string
+          description: Customer comment
+        ai_analysis:
+          readOnly: true
+          nullable: true
+          description: DeepSeek AI analysis result
+        feedback_for_owner:
+          type: string
+          readOnly: true
+          description: Feedback about restaurant (food, waiter, speed)
+        feedback_for_superadmin:
+          type: string
+          readOnly: true
+          description: Feedback about Waitly service
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+    PatchedSubscriptionKey:
+      type: object
+      description: Subscription key serializer.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        key:
+          type: string
+          readOnly: true
+        duration_months:
+          allOf:
+          - $ref: '#/components/schemas/DurationMonthsEnum'
+          minimum: -9223372036854775808
+          maximum: 9223372036854775807
+        is_activated:
+          type: boolean
+          readOnly: true
+        activated_by_restaurant:
+          type: string
+          format: uuid
+          readOnly: true
+          nullable: true
+        activated_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+    PatchedTable:
+      type: object
+      description: Table serializer.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        restaurant:
+          type: string
+          format: uuid
+        number:
+          type: string
+          description: Table number or identifier
+          maxLength: 20
+        qr_code:
+          type: string
+          format: uri
+          readOnly: true
+        is_occupied:
+          type: boolean
+        current_waiter:
+          type: integer
+          nullable: true
+        current_waiter_name:
+          type: string
+          readOnly: true
+          nullable: true
+        guest_url:
+          type: string
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+    PatchedUser:
+      type: object
+      description: User serializer.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        username:
+          type: string
+          title: Имя пользователя
+          description: Обязательное поле. Не более 150 символов. Только буквы, цифры
+            и символы @/./+/-/_.
+          pattern: ^[\w.@+-]+$
+          maxLength: 150
+        email:
+          type: string
+          format: email
+          title: Адрес электронной почты
+          maxLength: 254
+        phone_number:
+          type: string
+          readOnly: true
+        full_name:
+          type: string
+          readOnly: true
+        first_name:
+          type: string
+          title: Имя
+          maxLength: 150
+        last_name:
+          type: string
+          title: Фамилия
+          maxLength: 150
+        role:
+          $ref: '#/components/schemas/RoleEnum'
+        avatar:
+          type: string
+          format: uri
+          nullable: true
+        is_active:
+          type: boolean
+          title: Активный
+          description: Отметьте, если пользователь должен считаться активным. Уберите
+            эту отметку вместо удаления учётной записи.
+    PatchedWorkShift:
+      type: object
+      description: Work shift serializer.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        user:
+          type: integer
+        user_name:
+          type: string
+          readOnly: true
+        restaurant:
+          type: string
+          format: uuid
+        started_at:
+          type: string
+          format: date-time
+        ended_at:
+          type: string
+          format: date-time
+          nullable: true
+        orders_count:
+          type: integer
+          readOnly: true
+        total_amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+          readOnly: true
+    RatingFoodEnum:
+      enum:
+      - 1
+      - 2
+      - 3
+      - 4
+      - 5
+      type: integer
+      description: |-
+        * `1` - 1
+        * `2` - 2
+        * `3` - 3
+        * `4` - 4
+        * `5` - 5
+    RatingServiceSpeedEnum:
+      enum:
+      - 1
+      - 2
+      - 3
+      - 4
+      - 5
+      type: integer
+      description: |-
+        * `1` - 1
+        * `2` - 2
+        * `3` - 3
+        * `4` - 4
+        * `5` - 5
+    RatingWaiterEnum:
+      enum:
+      - 1
+      - 2
+      - 3
+      - 4
+      - 5
+      type: integer
+      description: |-
+        * `1` - 1
+        * `2` - 2
+        * `3` - 3
+        * `4` - 4
+        * `5` - 5
+    RatingWaitlyEnum:
+      enum:
+      - 1
+      - 2
+      - 3
+      - 4
+      - 5
+      type: integer
+      description: |-
+        * `1` - 1
+        * `2` - 2
+        * `3` - 3
+        * `4` - 4
+        * `5` - 5
+    Restaurant:
+      type: object
+      description: Restaurant serializer.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        name:
+          type: string
+          maxLength: 255
+        slug:
+          type: string
+          maxLength: 100
+          pattern: ^[-a-zA-Z0-9_]+$
+        chain:
+          type: string
+          format: uuid
+          nullable: true
+        chain_name:
+          type: string
+          readOnly: true
+        subdomain:
+          type: string
+          nullable: true
+          maxLength: 100
+          pattern: ^[-a-zA-Z0-9_]+$
+        owner:
+          type: integer
+        owner_name:
+          type: string
+          readOnly: true
+        subscription_active:
+          type: boolean
+        subscription_expires_at:
+          type: string
+          format: date-time
+          nullable: true
+        subscription_status:
+          type: string
+          readOnly: true
+        kitchen_token:
+          type: string
+          readOnly: true
+        full_url:
+          type: string
+          readOnly: true
+        kitchen_url:
+          type: string
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - chain_name
+      - created_at
+      - full_url
+      - id
+      - kitchen_token
+      - kitchen_url
+      - name
+      - owner
+      - owner_name
+      - slug
+      - subscription_status
+      - updated_at
+    RestaurantChain:
+      type: object
+      description: Restaurant chain serializer.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        name:
+          type: string
+          maxLength: 255
+        subdomain:
+          type: string
+          maxLength: 100
+          pattern: ^[-a-zA-Z0-9_]+$
+        owner:
+          type: integer
+        owner_name:
+          type: string
+          readOnly: true
+        restaurants_count:
+          type: string
+          readOnly: true
+        subscription_status:
+          type: string
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - created_at
+      - id
+      - name
+      - owner
+      - owner_name
+      - restaurants_count
+      - subdomain
+      - subscription_status
+      - updated_at
+    RestaurantCreate:
+      type: object
+      description: Restaurant creation serializer.
+      properties:
+        name:
+          type: string
+          maxLength: 255
+        slug:
+          type: string
+          maxLength: 100
+          pattern: ^[-a-zA-Z0-9_]+$
+        chain:
+          type: string
+          format: uuid
+          nullable: true
+        subdomain:
+          type: string
+          nullable: true
+          maxLength: 100
+          pattern: ^[-a-zA-Z0-9_]+$
+        owner:
+          type: integer
+        subscription_active:
+          type: boolean
+        subscription_expires_at:
+          type: string
+          format: date-time
+          nullable: true
+        create_owner:
+          type: boolean
+          writeOnly: true
+          default: false
+        owner_email:
+          type: string
+          format: email
+          writeOnly: true
+        owner_phone:
+          type: string
+          writeOnly: true
+        owner_password:
+          type: string
+          writeOnly: true
+          minLength: 6
+        owner_first_name:
+          type: string
+          writeOnly: true
+        owner_last_name:
+          type: string
+          writeOnly: true
+      required:
+      - name
+      - owner
+      - slug
+    Review:
+      type: object
+      description: Review serializer.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        order:
+          type: string
+          format: uuid
+        restaurant:
+          type: string
+          format: uuid
+        rating_food:
+          allOf:
+          - $ref: '#/components/schemas/RatingFoodEnum'
+          description: |-
+            Food quality rating
+
+            * `1` - 1
+            * `2` - 2
+            * `3` - 3
+            * `4` - 4
+            * `5` - 5
+          minimum: -9223372036854775808
+          maximum: 9223372036854775807
+        rating_service_speed:
+          allOf:
+          - $ref: '#/components/schemas/RatingServiceSpeedEnum'
+          description: |-
+            Service speed rating
+
+            * `1` - 1
+            * `2` - 2
+            * `3` - 3
+            * `4` - 4
+            * `5` - 5
+          minimum: -9223372036854775808
+          maximum: 9223372036854775807
+        rating_waiter:
+          allOf:
+          - $ref: '#/components/schemas/RatingWaiterEnum'
+          description: |-
+            Waiter performance rating
+
+            * `1` - 1
+            * `2` - 2
+            * `3` - 3
+            * `4` - 4
+            * `5` - 5
+          minimum: -9223372036854775808
+          maximum: 9223372036854775807
+        rating_waitly:
+          allOf:
+          - $ref: '#/components/schemas/RatingWaitlyEnum'
+          description: |-
+            Waitly service rating
+
+            * `1` - 1
+            * `2` - 2
+            * `3` - 3
+            * `4` - 4
+            * `5` - 5
+          minimum: -9223372036854775808
+          maximum: 9223372036854775807
+        average_rating:
+          type: number
+          format: double
+          readOnly: true
+        comment:
+          type: string
+          description: Customer comment
+        ai_analysis:
+          readOnly: true
+          nullable: true
+          description: DeepSeek AI analysis result
+        feedback_for_owner:
+          type: string
+          readOnly: true
+          description: Feedback about restaurant (food, waiter, speed)
+        feedback_for_superadmin:
+          type: string
+          readOnly: true
+          description: Feedback about Waitly service
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - ai_analysis
+      - average_rating
+      - created_at
+      - feedback_for_owner
+      - feedback_for_superadmin
+      - id
+      - order
+      - rating_food
+      - rating_service_speed
+      - rating_waiter
+      - rating_waitly
+      - restaurant
+    ReviewCreate:
+      type: object
+      description: Review creation serializer.
+      properties:
+        order:
+          type: string
+          format: uuid
+        rating_food:
+          allOf:
+          - $ref: '#/components/schemas/RatingFoodEnum'
+          description: |-
+            Food quality rating
+
+            * `1` - 1
+            * `2` - 2
+            * `3` - 3
+            * `4` - 4
+            * `5` - 5
+          minimum: -9223372036854775808
+          maximum: 9223372036854775807
+        rating_service_speed:
+          allOf:
+          - $ref: '#/components/schemas/RatingServiceSpeedEnum'
+          description: |-
+            Service speed rating
+
+            * `1` - 1
+            * `2` - 2
+            * `3` - 3
+            * `4` - 4
+            * `5` - 5
+          minimum: -9223372036854775808
+          maximum: 9223372036854775807
+        rating_waiter:
+          allOf:
+          - $ref: '#/components/schemas/RatingWaiterEnum'
+          description: |-
+            Waiter performance rating
+
+            * `1` - 1
+            * `2` - 2
+            * `3` - 3
+            * `4` - 4
+            * `5` - 5
+          minimum: -9223372036854775808
+          maximum: 9223372036854775807
+        rating_waitly:
+          allOf:
+          - $ref: '#/components/schemas/RatingWaitlyEnum'
+          description: |-
+            Waitly service rating
+
+            * `1` - 1
+            * `2` - 2
+            * `3` - 3
+            * `4` - 4
+            * `5` - 5
+          minimum: -9223372036854775808
+          maximum: 9223372036854775807
+        comment:
+          type: string
+          description: Customer comment
+      required:
+      - order
+      - rating_food
+      - rating_service_speed
+      - rating_waiter
+      - rating_waitly
+    RoleEnum:
+      enum:
+      - super_admin
+      - chain_admin
+      - restaurant_admin
+      - waiter
+      - customer
+      type: string
+      description: |-
+        * `super_admin` - Super Admin
+        * `chain_admin` - Chain Admin
+        * `restaurant_admin` - Restaurant Admin
+        * `waiter` - Waiter
+        * `customer` - Customer
+    StatusEnum:
+      enum:
+      - CREATED
+      - ACCEPTED
+      - COOKING
+      - READY
+      - DELIVERED
+      - CANCELLED
+      type: string
+      description: |-
+        * `CREATED` - Created
+        * `ACCEPTED` - Accepted by Cook
+        * `COOKING` - Cooking
+        * `READY` - Ready
+        * `DELIVERED` - Delivered
+        * `CANCELLED` - Cancelled
+    SubscriptionKey:
+      type: object
+      description: Subscription key serializer.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        key:
+          type: string
+          readOnly: true
+        duration_months:
+          allOf:
+          - $ref: '#/components/schemas/DurationMonthsEnum'
+          minimum: -9223372036854775808
+          maximum: 9223372036854775807
+        is_activated:
+          type: boolean
+          readOnly: true
+        activated_by_restaurant:
+          type: string
+          format: uuid
+          readOnly: true
+          nullable: true
+        activated_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - activated_at
+      - activated_by_restaurant
+      - created_at
+      - duration_months
+      - id
+      - is_activated
+      - key
+    Table:
+      type: object
+      description: Table serializer.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        restaurant:
+          type: string
+          format: uuid
+        number:
+          type: string
+          description: Table number or identifier
+          maxLength: 20
+        qr_code:
+          type: string
+          format: uri
+          readOnly: true
+        is_occupied:
+          type: boolean
+        current_waiter:
+          type: integer
+          nullable: true
+        current_waiter_name:
+          type: string
+          readOnly: true
+          nullable: true
+        guest_url:
+          type: string
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - created_at
+      - current_waiter_name
+      - guest_url
+      - id
+      - number
+      - qr_code
+      - restaurant
+    User:
+      type: object
+      description: User serializer.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        username:
+          type: string
+          title: Имя пользователя
+          description: Обязательное поле. Не более 150 символов. Только буквы, цифры
+            и символы @/./+/-/_.
+          pattern: ^[\w.@+-]+$
+          maxLength: 150
+        email:
+          type: string
+          format: email
+          title: Адрес электронной почты
+          maxLength: 254
+        phone_number:
+          type: string
+          readOnly: true
+        full_name:
+          type: string
+          readOnly: true
+        first_name:
+          type: string
+          title: Имя
+          maxLength: 150
+        last_name:
+          type: string
+          title: Фамилия
+          maxLength: 150
+        role:
+          $ref: '#/components/schemas/RoleEnum'
+        avatar:
+          type: string
+          format: uri
+          nullable: true
+        is_active:
+          type: boolean
+          title: Активный
+          description: Отметьте, если пользователь должен считаться активным. Уберите
+            эту отметку вместо удаления учётной записи.
+      required:
+      - full_name
+      - id
+      - phone_number
+      - username
+    UserCreate:
+      type: object
+      description: User creation serializer.
+      properties:
+        username:
+          type: string
+          title: Имя пользователя
+          description: Обязательное поле. Не более 150 символов. Только буквы, цифры
+            и символы @/./+/-/_.
+          pattern: ^[\w.@+-]+$
+          maxLength: 150
+        email:
+          type: string
+          format: email
+          title: Адрес электронной почты
+          maxLength: 254
+        phone_number:
+          type: string
+          nullable: true
+          maxLength: 128
+        first_name:
+          type: string
+          title: Имя
+          maxLength: 150
+        last_name:
+          type: string
+          title: Фамилия
+          maxLength: 150
+        role:
+          $ref: '#/components/schemas/RoleEnum'
+        password:
+          type: string
+          writeOnly: true
+          minLength: 6
+      required:
+      - password
+      - username
+    WorkShift:
+      type: object
+      description: Work shift serializer.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        user:
+          type: integer
+        user_name:
+          type: string
+          readOnly: true
+        restaurant:
+          type: string
+          format: uuid
+        started_at:
+          type: string
+          format: date-time
+        ended_at:
+          type: string
+          format: date-time
+          nullable: true
+        orders_count:
+          type: integer
+          readOnly: true
+        total_amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+          readOnly: true
+      required:
+      - id
+      - orders_count
+      - restaurant
+      - started_at
+      - total_amount
+      - user
+      - user_name
+  securitySchemes:
+    jwtAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT

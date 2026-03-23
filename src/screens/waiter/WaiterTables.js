@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import {
     View,
     Text,
@@ -9,93 +9,37 @@ import {
     ScrollView,
     Animated,
     Easing,
-    Dimensions
+    Dimensions,
 } from 'react-native';
-import { useAuth } from '../../context/AuthContext';
-import { fetchTables } from '../../api/tables';
 import { MaterialIcons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
+import { getTables, getTodayBookings, getOrders } from '../../api/apiService';
 
 const COLORS = {
     primary: '#ff6b6b',
     backgroundLight: '#f8f5f5',
-    backgroundDark: '#230f0f',
     success: '#52D681',
     danger: '#EE5A6F',
     warning: '#F7B731',
     white: '#FFFFFF',
     textDark: '#0f172a',
-    textLight: '#f1f5f9',
     textMuted: '#94a3b8',
-    textSlate400: '#94a3b8',
-    slate800: '#1e293b',
-    slate700: '#334155',
     slate100: '#f1f5f9',
 };
 
 const { width } = Dimensions.get('window');
-
 const FILTERS = ['Все', 'Свободные', 'Заняты', 'Забронированные'];
 
 export default function WaiterTables({ navigation }) {
-    const { user } = useAuth();
     const [tables, setTables] = useState([]);
     const [refreshing, setRefreshing] = useState(false);
     const [activeFilter, setActiveFilter] = useState('Все');
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState('');
 
-    // Animations
     const fadeAnim = useRef(new Animated.Value(0)).current;
     const translateY = useRef(new Animated.Value(20)).current;
-
-    // An array of animated values for each table card to create a stagger effect
     const [cardAnims, setCardAnims] = useState([]);
-
-    useEffect(() => {
-        loadData();
-    }, []);
-
-    useEffect(() => {
-        // Re-calculate card animations when tables or active filter changes
-        const filtered = getFilteredTables();
-        const anims = filtered.map(() => ({
-            opacity: new Animated.Value(0),
-            translateY: new Animated.Value(30),
-            scale: new Animated.Value(0.9)
-        }));
-        setCardAnims(anims);
-
-        if (filtered.length > 0) {
-            // Trigger exit animation for old cards (handled implicitly by re-render)
-            // Trigger entry staggred animation
-            const animations = anims.map((anim, index) => {
-                return Animated.parallel([
-                    Animated.timing(anim.opacity, {
-                        toValue: 1,
-                        duration: 400,
-                        delay: index * 100, // Stagger effect
-                        useNativeDriver: true,
-                        easing: Easing.out(Easing.back(1.5)),
-                    }),
-                    Animated.timing(anim.translateY, {
-                        toValue: 0,
-                        duration: 500,
-                        delay: index * 100,
-                        useNativeDriver: true,
-                        easing: Easing.out(Easing.back(1.5)),
-                    }),
-                    Animated.spring(anim.scale, {
-                        toValue: 1,
-                        friction: 6,
-                        tension: 40,
-                        delay: index * 100,
-                        useNativeDriver: true,
-                    })
-                ]);
-            });
-
-            Animated.parallel(animations).start();
-        }
-    }, [tables, activeFilter]);
 
     useEffect(() => {
         Animated.parallel([
@@ -109,52 +53,134 @@ export default function WaiterTables({ navigation }) {
                 duration: 600,
                 easing: Easing.out(Easing.cubic),
                 useNativeDriver: true,
-            })
+            }),
         ]).start();
     }, []);
 
-    const loadData = async () => {
-        setLoading(true);
+    const fetchTables = useCallback(async () => {
         try {
-            // Simulate fetching tables, but map them to the design's states
-            const data = await fetchTables();
-            let loadedTables = data.results || data || [];
-            if (loadedTables.length === 0) {
-                // Mock data if empty to match the design's "sick" look
-                loadedTables = [
-                    { id: 1, number: 5, status: 'AVAILABLE', label: 'Готов к приему' },
-                    { id: 2, number: 3, status: 'OCCUPIED', label: 'Мария И.', subLabel: '25 мин' },
-                    { id: 3, number: 12, status: 'RESERVED', label: '4 гостя', subLabel: 'Через 15 мин', time: '18:00' },
-                    { id: 4, number: 8, status: 'AVAILABLE', label: 'У окна' },
-                ];
-            } else {
-                // Map API tables to design variables roughly
-                loadedTables = loadedTables.map(t => ({
-                    ...t,
-                    status: t.is_occupied ? 'OCCUPIED' : 'AVAILABLE',
-                    label: t.is_occupied ? 'Busy' : 'Free'
-                }));
-            }
-            setTables(loadedTables);
-        } catch (error) {
-            console.error('Failed to load tables:', error);
-            // Fallback to mock data for layout testing
-            setTables([
-                { id: 1, number: 5, status: 'AVAILABLE', label: 'Готов к приему' },
-                { id: 2, number: 3, status: 'OCCUPIED', label: 'Мария И.', subLabel: '25 мин' },
-                { id: 3, number: 12, status: 'RESERVED', label: '4 гостя', subLabel: 'Через 15 мин', time: '18:00' },
-                { id: 4, number: 8, status: 'AVAILABLE', label: 'У окна' },
+            setError('');
+            const [tablesData, bookingsData, ordersData] = await Promise.all([
+                getTables(),
+                getTodayBookings().catch(() => []),
+                getOrders().catch(() => ({ results: [] })),
             ]);
+
+            const tablesList = tablesData.results || tablesData || [];
+            const bookingsList = Array.isArray(bookingsData) ? bookingsData :
+                (bookingsData?.results || []);
+            const ordersList = ordersData.results || ordersData || [];
+
+            // Build a map of booked table IDs
+            const bookedTableIds = new Set(bookingsList.map(b => b.table));
+
+            // Build a set of tables that have active orders (not delivered/cancelled)
+            const tablesWithActiveOrders = new Set();
+            const tableOrderInfo = {};
+            if (Array.isArray(ordersList)) {
+                ordersList.forEach(o => {
+                    if (['CREATED', 'ACCEPTED', 'COOKING', 'READY'].includes(o.status)) {
+                        // Use table UUID if available, or match by table_number
+                        if (o.table) tablesWithActiveOrders.add(o.table);
+                        tableOrderInfo[o.table] = o;
+                    }
+                });
+            }
+
+            // Map API tables to our display format
+            const mapped = tablesList.map((t) => {
+                let status = 'AVAILABLE';
+                let label = 'Готов к приему';
+                let subLabel = null;
+
+                if (t.is_occupied || tablesWithActiveOrders.has(t.id)) {
+                    status = 'OCCUPIED';
+                    const activeOrder = tableOrderInfo[t.id];
+                    if (activeOrder) {
+                        const statusText = {
+                            CREATED: 'Новый заказ',
+                            ACCEPTED: 'Принят',
+                            COOKING: 'Готовится',
+                            READY: 'Готов',
+                        }[activeOrder.status] || 'Занят';
+                        label = statusText;
+                        subLabel = activeOrder.waiter_name || t.current_waiter_name || '';
+                    } else {
+                        label = t.current_waiter_name || 'Занят';
+                        subLabel = '';
+                    }
+                } else if (bookedTableIds.has(t.id)) {
+                    status = 'RESERVED';
+                    const booking = bookingsList.find(b => b.table === t.id);
+                    label = `${booking?.guest_count || ''} гостей`;
+                    subLabel = booking?.booking_time ? `В ${booking.booking_time.slice(0, 5)}` : '';
+                }
+
+                return {
+                    id: t.id,
+                    number: t.number,
+                    status,
+                    capacity: 0,
+                    label,
+                    subLabel,
+                    is_occupied: t.is_occupied || tablesWithActiveOrders.has(t.id),
+                };
+            });
+
+            setTables(mapped);
+        } catch (e) {
+            console.log('Tables fetch failed:', e.message);
+            setTables([]);
+            setError('Не удалось загрузить столы');
         } finally {
             setLoading(false);
         }
-    };
+    }, []);
 
-    const onRefresh = async () => {
-        setRefreshing(true);
-        await loadData();
-        setRefreshing(false);
-    };
+    useFocusEffect(
+        useCallback(() => {
+            fetchTables();
+        }, [fetchTables])
+    );
+
+    useEffect(() => {
+        const filtered = getFilteredTables();
+        const anims = filtered.map(() => ({
+            opacity: new Animated.Value(0),
+            translateY: new Animated.Value(30),
+            scale: new Animated.Value(0.9),
+        }));
+        setCardAnims(anims);
+
+        if (filtered.length > 0) {
+            const animations = anims.map((anim, index) =>
+                Animated.parallel([
+                    Animated.timing(anim.opacity, {
+                        toValue: 1,
+                        duration: 400,
+                        delay: index * 80,
+                        useNativeDriver: true,
+                        easing: Easing.out(Easing.back(1.5)),
+                    }),
+                    Animated.timing(anim.translateY, {
+                        toValue: 0,
+                        duration: 500,
+                        delay: index * 80,
+                        useNativeDriver: true,
+                        easing: Easing.out(Easing.back(1.5)),
+                    }),
+                    Animated.spring(anim.scale, {
+                        toValue: 1,
+                        friction: 6,
+                        tension: 40,
+                        delay: index * 80,
+                        useNativeDriver: true,
+                    }),
+                ])
+            );
+            Animated.parallel(animations).start();
+        }
+    }, [tables, activeFilter]);
 
     const getFilteredTables = () => {
         if (activeFilter === 'Все') return tables;
@@ -164,9 +190,11 @@ export default function WaiterTables({ navigation }) {
         return tables;
     };
 
-    const handleFilterPress = (filter) => {
-        setActiveFilter(filter);
-    };
+    const onRefresh = useCallback(async () => {
+        setRefreshing(true);
+        await fetchTables();
+        setRefreshing(false);
+    }, [fetchTables]);
 
     const getStatusStyles = (status) => {
         switch (status) {
@@ -188,7 +216,6 @@ export default function WaiterTables({ navigation }) {
                     dotColor: COLORS.warning,
                     text: 'Бронь',
                 };
-            case 'AVAILABLE':
             default:
                 return {
                     borderColor: 'transparent',
@@ -201,16 +228,19 @@ export default function WaiterTables({ navigation }) {
         }
     };
 
-    // Render Table Card
+    const handleTablePress = (table) => {
+        if (table.status === 'AVAILABLE') {
+            navigation.navigate('OrderCreation', { tableNumber: table.number, tableId: table.id });
+        }
+    };
+
     const renderTable = (item, index) => {
         const anims = cardAnims[index] || {
             opacity: new Animated.Value(1),
             translateY: new Animated.Value(0),
-            scale: new Animated.Value(1)
+            scale: new Animated.Value(1),
         };
-        const styles_s = getStatusStyles(item.status);
-        const isReserved = item.status === 'RESERVED';
-        const isOccupied = item.status === 'OCCUPIED';
+        const s = getStatusStyles(item.status);
 
         return (
             <Animated.View
@@ -221,42 +251,42 @@ export default function WaiterTables({ navigation }) {
                         opacity: anims.opacity,
                         transform: [
                             { translateY: anims.translateY },
-                            { scale: anims.scale }
-                        ]
-                    }
+                            { scale: anims.scale },
+                        ],
+                    },
                 ]}
             >
-                <TouchableOpacity activeOpacity={0.8} style={styles.touchableArea}>
-                    <View style={[styles.tableCard, { borderColor: styles_s.borderColor, borderWidth: styles_s.borderWidth }]}>
-                        {/* Circle */}
-                        <View style={[styles.tableCircle, { backgroundColor: styles_s.circleBg }]}>
-                            <Text style={[styles.tableNumber, { color: styles_s.textColor }]}>{item.number}</Text>
+                <TouchableOpacity
+                    activeOpacity={0.8}
+                    onPress={() => handleTablePress(item)}
+                    style={[styles.tableCard, { borderColor: s.borderColor, borderWidth: s.borderWidth }]}
+                >
+                    <View style={[styles.tableCircle, { backgroundColor: s.circleBg }]}>
+                        <Text style={[styles.tableNumber, { color: s.textColor }]}>{item.number}</Text>
+                    </View>
+
+                    <View style={styles.tableInfo}>
+                        <View style={styles.statusRow}>
+                            <View style={[styles.statusDot, { backgroundColor: s.dotColor }]} />
+                            <Text style={[styles.statusText, { color: s.dotColor }]}>
+                                {s.text}
+                            </Text>
                         </View>
 
-                        {/* Info Block */}
-                        <View style={styles.tableInfo}>
-                            <View style={styles.statusRow}>
-                                <View style={[styles.statusDot, { backgroundColor: styles_s.dotColor }]} />
-                                <Text style={[styles.statusText, { color: styles_s.dotColor }]}>
-                                    {styles_s.text} {item.time ? item.time : ''}
-                                </Text>
+                        {item.status === 'OCCUPIED' || item.status === 'RESERVED' ? (
+                            <Text style={styles.boldLabel}>{item.label}</Text>
+                        ) : (
+                            <Text style={styles.mutedLabel}>{item.label}</Text>
+                        )}
+
+                        {item.subLabel ? (
+                            <View style={styles.subLabelRow}>
+                                {item.status === 'OCCUPIED' && (
+                                    <MaterialIcons name="schedule" size={12} color={COLORS.textMuted} />
+                                )}
+                                <Text style={styles.mutedLabelSmall}>{item.subLabel}</Text>
                             </View>
-
-                            {/* Main Label */}
-                            {isOccupied || isReserved ? (
-                                <Text style={styles.boldLabel}>{item.label}</Text>
-                            ) : (
-                                <Text style={styles.mutedLabel}>{item.label}</Text>
-                            )}
-
-                            {/* Sub Label */}
-                            {item.subLabel && (
-                                <View style={styles.subLabelRow}>
-                                    {isOccupied && <MaterialIcons name="schedule" size={12} color={COLORS.textMuted} />}
-                                    <Text style={styles.mutedLabelSmall}>{item.subLabel}</Text>
-                                </View>
-                            )}
-                        </View>
+                        ) : null}
                     </View>
                 </TouchableOpacity>
             </Animated.View>
@@ -265,18 +295,14 @@ export default function WaiterTables({ navigation }) {
 
     return (
         <SafeAreaView style={styles.container}>
-            {/* Header */}
             <Animated.View style={[styles.header, { opacity: fadeAnim, transform: [{ translateY }] }]}>
-                <TouchableOpacity style={styles.headerBtn} onPress={() => navigation.goBack()}>
-                    <MaterialIcons name="arrow-back" size={24} color={COLORS.textDark} />
-                </TouchableOpacity>
+                <View style={{ width: 40 }} />
                 <Text style={styles.headerTitle}>Столики</Text>
                 <TouchableOpacity style={styles.headerBtn}>
                     <MaterialIcons name="tune" size={24} color={COLORS.textDark} />
                 </TouchableOpacity>
             </Animated.View>
 
-            {/* Filters */}
             <Animated.View style={[styles.filtersWrapper, { opacity: fadeAnim }]}>
                 <ScrollView
                     horizontal
@@ -289,16 +315,18 @@ export default function WaiterTables({ navigation }) {
                             <TouchableOpacity
                                 key={index}
                                 activeOpacity={0.7}
-                                onPress={() => handleFilterPress(filter)}
+                                onPress={() => setActiveFilter(filter)}
                                 style={[
                                     styles.filterPill,
-                                    isActive ? styles.filterPillActive : styles.filterPillInactive
+                                    isActive ? styles.filterPillActive : styles.filterPillInactive,
                                 ]}
                             >
-                                <Text style={[
-                                    styles.filterText,
-                                    isActive ? styles.filterTextActive : styles.filterTextInactive
-                                ]}>
+                                <Text
+                                    style={[
+                                        styles.filterText,
+                                        isActive ? styles.filterTextActive : styles.filterTextInactive,
+                                    ]}
+                                >
                                     {filter}
                                 </Text>
                             </TouchableOpacity>
@@ -307,7 +335,6 @@ export default function WaiterTables({ navigation }) {
                 </ScrollView>
             </Animated.View>
 
-            {/* Tables Grid */}
             <ScrollView
                 style={styles.mainScroll}
                 contentContainerStyle={styles.mainScrollContent}
@@ -317,30 +344,29 @@ export default function WaiterTables({ navigation }) {
                 <View style={styles.gridContainer}>
                     {getFilteredTables().map((item, index) => renderTable(item, index))}
                 </View>
+
+                {loading && (
+                    <View style={styles.emptyWrap}>
+                        <MaterialIcons name="hourglass-empty" size={48} color={COLORS.textMuted} />
+                        <Text style={styles.emptyTitle}>Загрузка столов...</Text>
+                    </View>
+                )}
+
+                {!loading && error ? (
+                    <TouchableOpacity style={styles.emptyWrap} activeOpacity={0.8} onPress={fetchTables}>
+                        <MaterialIcons name="wifi-off" size={48} color={COLORS.textMuted} />
+                        <Text style={styles.emptyTitle}>{error}</Text>
+                        <Text style={styles.emptySubTitle}>Нажмите, чтобы попробовать снова</Text>
+                    </TouchableOpacity>
+                ) : null}
+
+                {!loading && !error && getFilteredTables().length === 0 && (
+                    <View style={styles.emptyWrap}>
+                        <MaterialIcons name="table-restaurant" size={48} color={COLORS.textMuted} />
+                        <Text style={styles.emptyTitle}>Столы не найдены</Text>
+                    </View>
+                )}
             </ScrollView>
-
-            {/* Bottom Navigation */}
-            <View style={styles.bottomNav}>
-                <TouchableOpacity style={styles.navItem} onPress={() => navigation.replace('WaiterDashboard')}>
-                    <MaterialIcons name="dashboard" size={24} color={COLORS.textMuted} />
-                    <Text style={styles.navLabel}>Дашборд</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity style={styles.navItem}>
-                    <MaterialIcons name="table-restaurant" size={24} color={COLORS.primary} />
-                    <Text style={styles.navLabelActive}>Столы</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity style={styles.navItem}>
-                    <MaterialIcons name="content-copy" size={24} color={COLORS.textMuted} />
-                    <Text style={styles.navLabel}>Заказы</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity style={styles.navItem}>
-                    <MaterialIcons name="restaurant-menu" size={24} color={COLORS.textMuted} />
-                    <Text style={styles.navLabel}>Меню</Text>
-                </TouchableOpacity>
-            </View>
         </SafeAreaView>
     );
 }
@@ -356,10 +382,9 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         paddingHorizontal: 16,
         paddingVertical: 16,
-        backgroundColor: 'rgba(248, 245, 245, 0.9)',
-        zIndex: 10,
+        backgroundColor: 'rgba(248, 245, 245, 0.95)',
         borderBottomWidth: 1,
-        borderBottomColor: 'rgba(255, 107, 107, 0.1)',
+        borderBottomColor: 'rgba(255, 107, 107, 0.08)',
     },
     headerBtn: {
         width: 40,
@@ -367,22 +392,20 @@ const styles = StyleSheet.create({
         borderRadius: 20,
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: 'transparent',
     },
     headerTitle: {
         fontSize: 20,
-        fontWeight: '600',
+        fontWeight: '700',
         color: COLORS.textDark,
-        fontFamily: 'System',
     },
     filtersWrapper: {
-        marginBottom: 8,
+        marginBottom: 4,
     },
     filtersContainer: {
         paddingHorizontal: 16,
-        paddingTop: 16,
+        paddingTop: 12,
         paddingBottom: 8,
-        gap: 12,
+        gap: 10,
         flexDirection: 'row',
     },
     filterPill: {
@@ -391,38 +414,31 @@ const styles = StyleSheet.create({
         borderRadius: 9999,
         justifyContent: 'center',
         alignItems: 'center',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
-        shadowRadius: 3,
-        elevation: 1,
     },
     filterPillActive: {
         backgroundColor: COLORS.primary,
-        borderWidth: 1,
-        borderColor: COLORS.primary,
     },
     filterPillInactive: {
         backgroundColor: COLORS.white,
         borderWidth: 1,
-        borderColor: 'rgba(255, 107, 107, 0.1)',
+        borderColor: 'rgba(0,0,0,0.06)',
     },
     filterText: {
         fontSize: 14,
-        fontWeight: '500',
+        fontWeight: '600',
     },
     filterTextActive: {
         color: COLORS.white,
     },
     filterTextInactive: {
-        color: COLORS.textSlate400,
+        color: COLORS.textMuted,
     },
     mainScroll: {
         flex: 1,
     },
     mainScrollContent: {
         paddingHorizontal: 16,
-        paddingBottom: 100, // Space for bottom nav
+        paddingBottom: 24,
     },
     gridContainer: {
         flexDirection: 'row',
@@ -434,19 +450,16 @@ const styles = StyleSheet.create({
         width: '48%',
         marginBottom: 16,
     },
-    touchableArea: {
-        flex: 1,
-    },
     tableCard: {
         backgroundColor: COLORS.white,
-        borderRadius: 16,
-        padding: 16,
+        borderRadius: 18,
+        padding: 18,
         alignItems: 'center',
         justifyContent: 'center',
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.05,
-        shadowRadius: 5,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.04,
+        shadowRadius: 8,
         elevation: 2,
     },
     tableCircle: {
@@ -458,8 +471,8 @@ const styles = StyleSheet.create({
         marginBottom: 12,
     },
     tableNumber: {
-        fontSize: 30,
-        fontWeight: 'bold',
+        fontSize: 28,
+        fontWeight: '800',
     },
     tableInfo: {
         alignItems: 'center',
@@ -467,7 +480,6 @@ const styles = StyleSheet.create({
     statusRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'center',
         gap: 6,
         marginBottom: 4,
     },
@@ -478,18 +490,18 @@ const styles = StyleSheet.create({
     },
     statusText: {
         fontSize: 14,
-        fontWeight: '500',
+        fontWeight: '600',
     },
     boldLabel: {
-        fontSize: 12,
+        fontSize: 13,
         fontWeight: '600',
         color: COLORS.textDark,
-        marginTop: 4,
+        marginTop: 2,
     },
     mutedLabel: {
-        fontSize: 12,
+        fontSize: 13,
         color: COLORS.textMuted,
-        marginTop: 4,
+        marginTop: 2,
     },
     subLabelRow: {
         flexDirection: 'row',
@@ -501,35 +513,20 @@ const styles = StyleSheet.create({
         fontSize: 12,
         color: COLORS.textMuted,
     },
-    bottomNav: {
-        position: 'absolute',
-        bottom: 0,
-        left: 0,
-        right: 0,
-        backgroundColor: COLORS.white,
-        borderTopWidth: 1,
-        borderTopColor: 'rgba(255, 107, 107, 0.1)',
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        paddingHorizontal: 16,
-        paddingTop: 12,
-        paddingBottom: 24, // Safe area for iPhone
-        zIndex: 20,
-    },
-    navItem: {
-        flex: 1,
+    emptyWrap: {
+        paddingVertical: 56,
         alignItems: 'center',
         justifyContent: 'center',
-        gap: 4,
     },
-    navLabel: {
-        fontSize: 10,
-        fontWeight: '500',
+    emptyTitle: {
+        marginTop: 12,
+        fontSize: 16,
+        fontWeight: '600',
         color: COLORS.textMuted,
     },
-    navLabelActive: {
-        fontSize: 10,
-        fontWeight: '500',
-        color: COLORS.primary,
-    }
+    emptySubTitle: {
+        marginTop: 4,
+        fontSize: 13,
+        color: COLORS.textMuted,
+    },
 });
