@@ -23,6 +23,12 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-localization"
+    ],
+    "experiments": {
+      "baseUrl": "/Waitly-React"
     }
   }
 }
