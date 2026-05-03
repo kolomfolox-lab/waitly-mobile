@@ -5,17 +5,19 @@ import {
     StyleSheet,
     TouchableOpacity,
     RefreshControl,
-    SafeAreaView,
     ScrollView,
     Animated,
     Easing,
     Dimensions,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/AuthContext';
 import { MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect } from '@react-navigation/native';
 import { getOrders, getTables, getTodayBookings } from '../../api/apiService';
+import UserAvatar from '../../components/common/UserAvatar';
+import { loadStoredAvatarPreset } from '../../utils/avatar';
 
 const COLORS = {
     primary: '#ff6b6b',
@@ -35,6 +37,7 @@ const { width } = Dimensions.get('window');
 export default function WaiterDashboard({ navigation }) {
     const { user } = useAuth();
     const [refreshing, setRefreshing] = useState(false);
+    const [avatarPresetId, setAvatarPresetId] = useState(null);
 
     const [stats, setStats] = useState({
         tables: { total: 0, available: 0 },
@@ -133,6 +136,7 @@ export default function WaiterDashboard({ navigation }) {
     useFocusEffect(
         useCallback(() => {
             fetchDashboardData();
+            loadStoredAvatarPreset().then(setAvatarPresetId).catch(() => {});
         }, [fetchDashboardData])
     );
 
@@ -196,9 +200,13 @@ export default function WaiterDashboard({ navigation }) {
                         style={styles.avatarBtn}
                         onPress={() => navigation.navigate('ProfileTab')}
                     >
-                        <Text style={styles.avatarText}>
-                            {user?.full_name?.charAt(0)?.toUpperCase() || '👤'}
-                        </Text>
+                        <UserAvatar
+                            fullName={user?.full_name}
+                            avatarPresetId={avatarPresetId}
+                            size={44}
+                            fallbackBackgroundColor={COLORS.primary}
+                            fallbackTextColor={COLORS.white}
+                        />
                     </TouchableOpacity>
                 </Animated.View>
 
@@ -329,7 +337,6 @@ const styles = StyleSheet.create({
         width: 44,
         height: 44,
         borderRadius: 22,
-        backgroundColor: COLORS.primary,
         justifyContent: 'center',
         alignItems: 'center',
         shadowColor: COLORS.primary,
@@ -337,11 +344,6 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.2,
         shadowRadius: 6,
         elevation: 4,
-    },
-    avatarText: {
-        color: COLORS.white,
-        fontSize: 18,
-        fontWeight: '700',
     },
     summaryCard: {
         borderRadius: 20,

@@ -51,8 +51,8 @@ export const getCategories = async () => {
     return response.data; // Paginated: { count, next, previous, results }
 };
 
-export const getDishes = async () => {
-    const response = await apiClient.get('/api/menu/dishes/');
+export const getDishes = async (params = {}) => {
+    const response = await apiClient.get('/api/menu/dishes/', { params });
     return response.data; // Paginated
 };
 
@@ -65,9 +65,14 @@ export const getDishesByCategory = async () => {
 // Orders
 // =====================
 
-export const getOrders = async () => {
-    const response = await apiClient.get('/api/orders/orders/');
+export const getOrders = async (params = {}) => {
+    const response = await apiClient.get('/api/orders/orders/', { params });
     return response.data; // Paginated
+};
+
+export const getOrderDetail = async (orderId) => {
+    const response = await apiClient.get(`/api/orders/orders/${orderId}/`);
+    return response.data;
 };
 
 export const createOrder = async (tableId, items) => {
@@ -124,13 +129,43 @@ export const acceptOrder = async (orderId) => {
     return response.data;
 };
 
+export const startOrderCooking = async (orderId) => {
+    const response = await apiClient.post(`/api/orders/orders/${orderId}/cooking/`);
+    return response.data;
+};
+
 export const markOrderReady = async (orderId) => {
     const response = await apiClient.post(`/api/orders/orders/${orderId}/ready/`);
     return response.data;
 };
 
+export const addOrderDelay = async (orderId, { extra_time, reason } = {}) => {
+    const response = await apiClient.post(`/api/orders/orders/${orderId}/add_delay/`, {
+        extra_time,
+        reason,
+    });
+    return response.data;
+};
+
+export const updateOrder = async (orderId, payload) => {
+    const response = await apiClient.patch(`/api/orders/orders/${orderId}/`, payload);
+    return response.data;
+};
+
+export const assignOrderCook = async (orderId, cookId) => {
+    const response = await apiClient.patch(`/api/orders/orders/${orderId}/`, {
+        cook: cookId,
+    });
+    return response.data;
+};
+
 export const deliverOrder = async (orderId) => {
     const response = await apiClient.post(`/api/orders/orders/${orderId}/deliver/`);
+    return response.data;
+};
+
+export const cancelOrder = async (orderId, payload = {}) => {
+    const response = await apiClient.post(`/api/orders/orders/${orderId}/cancel/`, payload);
     return response.data;
 };
 
@@ -166,8 +201,18 @@ export const getAnalyticsSummary = async () => {
 // Dish Availability (Chef)
 // =====================
 
-export const toggleDishAvailability = async (dishId) => {
-    const response = await apiClient.post(`/api/menu/dishes/${dishId}/toggle_availability/`);
+export const toggleDishAvailability = async (dishId, payload = {}) => {
+    const response = await apiClient.post(`/api/menu/dishes/${dishId}/toggle_availability/`, payload);
+    return response.data;
+};
+
+export const getMenuSettings = async (params = {}) => {
+    const response = await apiClient.get('/api/menu/settings/', { params });
+    return response.data;
+};
+
+export const getUsers = async (params = {}) => {
+    const response = await apiClient.get('/api/auth/users/', { params });
     return response.data;
 };
 

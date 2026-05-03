@@ -53,6 +53,7 @@ export default function MenuManagementScreen() {
     const [newDishName, setNewDishName] = useState('');
     const [newDishPrice, setNewDishPrice] = useState('');
     const [newDishTime, setNewDishTime] = useState('25');
+    const [newDishComment, setNewDishComment] = useState('');
     const [isCreatingDish, setIsCreatingDish] = useState(false);
 
     const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -114,11 +115,19 @@ export default function MenuManagementScreen() {
             if (activeCategory !== 'all') {
                 formData.append('category', activeCategory);
             }
+            if (newDishTime) {
+                formData.append('cooking_time', newDishTime);
+            }
+            if (newDishComment.trim()) {
+                formData.append('description', newDishComment.trim());
+            }
             await createDish(formData);
             fetchMenu();
             setIsAddModalVisible(false);
             setNewDishName('');
             setNewDishPrice('');
+            setNewDishTime('25');
+            setNewDishComment('');
         } catch (e) {
             Alert.alert('Ошибка', e.response?.data?.detail || 'Не удалось добавить блюдо');
         } finally {
@@ -235,7 +244,7 @@ export default function MenuManagementScreen() {
                                     </View>
 
                                     <Text style={styles.dishDesc} numberOfLines={1}>
-                                        {dish.category_name || 'Вкусное блюдо'}
+                                        {dish.description || dish.category_name || 'Вкусное блюдо'}
                                     </Text>
 
                                     <View style={styles.dishFooterRow}>
@@ -356,6 +365,20 @@ export default function MenuManagementScreen() {
                                 onChangeText={setNewDishTime}
                             />
                         </View>
+
+                        <Text style={styles.fieldLabel}>Комментарий к блюду</Text>
+                        <View style={[styles.inputWrap, styles.commentWrap]}>
+                            <TextInput
+                                style={[styles.input, styles.commentInput]}
+                                placeholder="Например: острое, фирменная подача, без орехов"
+                                placeholderTextColor={COLORS.textMuted}
+                                value={newDishComment}
+                                onChangeText={setNewDishComment}
+                                multiline
+                                numberOfLines={4}
+                                textAlignVertical="top"
+                            />
+                        </View>
                     </ScrollView>
 
                     <View style={styles.modalFooter}>
@@ -454,6 +477,8 @@ const styles = StyleSheet.create({
         borderRadius: 16, borderWidth: 1, borderColor: COLORS.slate100, marginBottom: 16
     },
     input: { flex: 1, paddingHorizontal: 16, paddingVertical: 14, fontSize: 15, color: COLORS.textDark },
+    commentWrap: { alignItems: 'flex-start', minHeight: 110 },
+    commentInput: { minHeight: 94, paddingTop: 14 },
     inputIcon: { marginRight: 16 },
     twoColRow: { flexDirection: 'row', justifyContent: 'space-between' },
 

@@ -30,13 +30,15 @@ export default function App() {
       return;
     }
 
+    NavigationBar.setBackgroundColorAsync('#ffffff').catch(() => {});
+    NavigationBar.setButtonStyleAsync('dark').catch(() => {});
     NavigationBar.setStyle('dark');
   }, []);
 
   return (
     <AuthProvider>
       <NotificationsProvider>
-        <StatusBar style="auto" />
+        <StatusBar style="dark" backgroundColor="#ffffff" />
         <AppNavigator />
       </NotificationsProvider>
     </AuthProvider>

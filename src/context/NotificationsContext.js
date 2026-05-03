@@ -24,9 +24,9 @@ const SUPPORTED_ROLES = new Set(['WAITER', 'HEAD_WAITER', 'HOSTESS']);
 export const useNotifications = () => useContext(NotificationsContext);
 
 const getNotificationTimestamp = (value) => {
-    if (!value) return Date.now();
+    if (!value) return 0;
     const parsed = new Date(value).getTime();
-    return Number.isNaN(parsed) ? Date.now() : parsed;
+    return Number.isNaN(parsed) ? 0 : parsed;
 };
 
 const buildOrderReadyNotifications = (orders, settings) => {
@@ -41,7 +41,7 @@ const buildOrderReadyNotifications = (orders, settings) => {
             type: 'ORDER_READY',
             title: 'Заказ готов',
             message: `Заказ по столу ${order.table_number || 'без номера'} готов к подаче`,
-            createdAt: order.updated_at || order.ready_at || order.created_at || new Date().toISOString(),
+            createdAt: order.updated_at || order.ready_at || order.created_at || null,
             entityId: order.id,
             meta: {
                 orderId: order.id,
@@ -82,7 +82,7 @@ const buildWaiterCallNotifications = (tables, user, settings) => {
                 type: 'WAITER_CALL',
                 title: 'Вызов официанта',
                 message: `Стол ${table.number || 'без номера'} вызывает официанта`,
-                createdAt: callTime || new Date().toISOString(),
+                createdAt: callTime || null,
                 entityId: table.id,
                 meta: {
                     tableId: table.id,

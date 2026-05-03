@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTranslation } from 'react-i18next';
@@ -12,19 +13,21 @@ const COLORS = {
     textMuted: '#94a3b8',
 };
 
-const LANGUAGES = [
-    { code: 'ru', label: 'Русский' },
-    { code: 'uz', label: "O'zbekcha" },
-    { code: 'en', label: 'English' },
-];
-
 export default function LanguageScreen({ navigation }) {
-    const { i18n } = useTranslation();
+    const { i18n, t } = useTranslation();
+
+    const LANGUAGES = [
+        { code: 'ru', short: t('language_short_ru'), label: t('language_name_ru') },
+        { code: 'en', short: t('language_short_en'), label: t('language_name_en') },
+        { code: 'uz', short: t('language_short_uz'), label: t('language_name_uz') },
+    ];
 
     const handleChangeLanguage = async (language) => {
         await i18n.changeLanguage(language);
         await AsyncStorage.setItem('app_language', language);
     };
+
+    const activeLanguage = (i18n.resolvedLanguage || i18n.language || 'ru').split('-')[0].toLowerCase();
 
     return (
         <SafeAreaView style={styles.container}>
@@ -32,20 +35,25 @@ export default function LanguageScreen({ navigation }) {
                 <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
                     <MaterialIcons name="arrow-back" size={24} color={COLORS.textDark} />
                 </TouchableOpacity>
-                <Text style={styles.headerTitle}>Язык</Text>
+                <Text style={styles.headerTitle}>{t('language_title')}</Text>
                 <View style={styles.backBtn} />
             </View>
 
             <View style={styles.content}>
                 {LANGUAGES.map((language) => {
-                    const isActive = i18n.language === language.code;
+                    const isActive = activeLanguage === language.code;
                     return (
                         <TouchableOpacity
                             key={language.code}
                             style={[styles.card, isActive && styles.cardActive]}
                             onPress={() => handleChangeLanguage(language.code)}
                         >
-                            <Text style={styles.cardLabel}>{language.label}</Text>
+                            <View style={styles.languageInfo}>
+                                <View style={[styles.shortBadge, isActive && styles.shortBadgeActive]}>
+                                    <Text style={[styles.shortBadgeText, isActive && styles.shortBadgeTextActive]}>{language.short}</Text>
+                                </View>
+                                <Text style={styles.cardLabel}>{language.label}</Text>
+                            </View>
                             {isActive && <MaterialIcons name="check-circle" size={22} color={COLORS.primary} />}
                         </TouchableOpacity>
                     );
@@ -80,6 +88,32 @@ const styles = StyleSheet.create({
     content: {
         padding: 16,
         gap: 12,
+    },
+    languageInfo: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    shortBadge: {
+        minWidth: 54,
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 8,
+        paddingHorizontal: 10,
+        borderRadius: 12,
+        backgroundColor: COLORS.backgroundLight,
+        marginRight: 12,
+    },
+    shortBadgeActive: {
+        backgroundColor: 'rgba(255, 107, 107, 0.12)',
+    },
+    shortBadgeText: {
+        fontSize: 12,
+        fontWeight: '800',
+        color: COLORS.textMuted,
+        letterSpacing: 0.3,
+    },
+    shortBadgeTextActive: {
+        color: COLORS.primary,
     },
     card: {
         flexDirection: 'row',

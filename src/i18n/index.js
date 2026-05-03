@@ -16,8 +16,12 @@ const resources = {
 // Get device language safely
 const getDeviceLanguage = () => {
     try {
-        const locale = Localization.locale || Localization.locales?.[0] || 'ru-RU';
-        return locale.split('-')[0];
+        const locale = Localization.getLocales?.()?.[0]?.languageTag
+            || Localization.locale
+            || Localization.locales?.[0]?.languageTag
+            || Localization.locales?.[0]
+            || 'ru-RU';
+        return String(locale).split('-')[0].toLowerCase();
     } catch (error) {
         return 'ru';
     }
@@ -30,6 +34,10 @@ i18n
         resources,
         lng: getDeviceLanguage(), // Get device language safely
         fallbackLng: 'ru', // Default to Russian
+        supportedLngs: ['ru', 'uz', 'en'],
+        nonExplicitSupportedLngs: true,
+        cleanCode: true,
+        load: 'languageOnly',
         interpolation: {
             escapeValue: false,
         },

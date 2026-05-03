@@ -5,14 +5,15 @@ import {
     StyleSheet,
     TouchableOpacity,
     RefreshControl,
-    SafeAreaView,
     ScrollView,
     Animated,
     Easing,
     Dimensions,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
+import { useTranslation } from 'react-i18next';
 import { getTables, getTodayBookings, getOrders } from '../../api/apiService';
 
 const COLORS = {
@@ -28,14 +29,21 @@ const COLORS = {
 };
 
 const { width } = Dimensions.get('window');
-const FILTERS = ['Все', 'Свободные', 'Заняты', 'Забронированные'];
 
 export default function WaiterTables({ navigation }) {
+    const { t } = useTranslation();
     const [tables, setTables] = useState([]);
     const [refreshing, setRefreshing] = useState(false);
-    const [activeFilter, setActiveFilter] = useState('Все');
+    const [activeFilter, setActiveFilter] = useState('ALL');
     const [loading, setLoading] = useState(true);
-    const [error, setError] = useState('');
+    const [error, setError] = useState(false);
+
+    const filters = [
+        { key: 'ALL', label: t('filter_all') },
+        { key: 'AVAILABLE', label: t('filter_available') },
+        { key: 'OCCUPIED', label: t('filter_occupied') },
+        { key: 'RESERVED', label: t('filter_reserved') },
+    ];
 
     const fadeAnim = useRef(new Animated.Value(0)).current;
     const translateY = useRef(new Animated.Value(20)).current;
@@ -59,7 +67,7 @@ export default function WaiterTables({ navigation }) {
 
     const fetchTables = useCallback(async () => {
         try {
-            setError('');
+            setError(false);
             const [tablesData, bookingsData, ordersData] = await Promise.all([
                 getTables(),
                 getTodayBookings().catch(() => []),
@@ -88,42 +96,47 @@ export default function WaiterTables({ navigation }) {
             }
 
             // Map API tables to our display format
-            const mapped = tablesList.map((t) => {
+            const mapped = tablesList.map((table) => {
                 let status = 'AVAILABLE';
-                let label = 'Готов к приему';
+                let label = t('table_ready_to_accept');
                 let subLabel = null;
 
-                if (t.is_occupied || tablesWithActiveOrders.has(t.id)) {
-                    status = 'OCCUPIED';
-                    const activeOrder = tableOrderInfo[t.id];
+                if (table.is_occupied || tablesWithActiveOrders.has(table.id)) {
+                    const activeOrder = tableOrderInfo[table.id];
                     if (activeOrder) {
+                        status = activeOrder.status === 'READY' ? 'READY' : 'OCCUPIED';
                         const statusText = {
-                            CREATED: 'Новый заказ',
-                            ACCEPTED: 'Принят',
-                            COOKING: 'Готовится',
-                            READY: 'Готов',
-                        }[activeOrder.status] || 'Занят';
+                            CREATED: t('table_order_new'),
+                            ACCEPTED: t('table_order_accepted'),
+                            COOKING: t('table_order_cooking'),
+                            READY: t('table_order_ready'),
+                        }[activeOrder.status] || t('table_busy');
                         label = statusText;
-                        subLabel = activeOrder.waiter_name || t.current_waiter_name || '';
+                        subLabel = activeOrder.waiter_name || table.current_waiter_name || '';
                     } else {
-                        label = t.current_waiter_name || 'Занят';
+                        status = 'OCCUPIED';
+                        label = table.current_waiter_name || t('table_busy');
                         subLabel = '';
                     }
-                } else if (bookedTableIds.has(t.id)) {
+                } else if (bookedTableIds.has(table.id)) {
                     status = 'RESERVED';
-                    const booking = bookingsList.find(b => b.table === t.id);
-                    label = `${booking?.guest_count || ''} гостей`;
-                    subLabel = booking?.booking_time ? `В ${booking.booking_time.slice(0, 5)}` : '';
+                    const booking = bookingsList.find((entry) => entry.table === table.id);
+                    label = booking?.guest_count
+                        ? t('booking_guests', { count: booking.guest_count })
+                        : t('table_booking');
+                    subLabel = booking?.booking_time
+                        ? t('booking_at_time', { time: booking.booking_time.slice(0, 5) })
+                        : '';
                 }
 
                 return {
-                    id: t.id,
-                    number: t.number,
+                    id: table.id,
+                    number: table.number,
                     status,
                     capacity: 0,
                     label,
                     subLabel,
-                    is_occupied: t.is_occupied || tablesWithActiveOrders.has(t.id),
+                    is_occupied: table.is_occupied || tablesWithActiveOrders.has(table.id),
                 };
             });
 
@@ -131,11 +144,11 @@ export default function WaiterTables({ navigation }) {
         } catch (e) {
             console.log('Tables fetch failed:', e.message);
             setTables([]);
-            setError('Не удалось загрузить столы');
+            setError(true);
         } finally {
             setLoading(false);
         }
-    }, []);
+    }, [t]);
 
     useFocusEffect(
         useCallback(() => {
@@ -183,10 +196,10 @@ export default function WaiterTables({ navigation }) {
     }, [tables, activeFilter]);
 
     const getFilteredTables = () => {
-        if (activeFilter === 'Все') return tables;
-        if (activeFilter === 'Свободные') return tables.filter(t => t.status === 'AVAILABLE');
-        if (activeFilter === 'Заняты') return tables.filter(t => t.status === 'OCCUPIED');
-        if (activeFilter === 'Забронированные') return tables.filter(t => t.status === 'RESERVED');
+        if (activeFilter === 'ALL') return tables;
+        if (activeFilter === 'AVAILABLE') return tables.filter(t => t.status === 'AVAILABLE');
+        if (activeFilter === 'OCCUPIED') return tables.filter(t => t.status === 'OCCUPIED' || t.status === 'READY');
+        if (activeFilter === 'RESERVED') return tables.filter(t => t.status === 'RESERVED');
         return tables;
     };
 
@@ -198,6 +211,15 @@ export default function WaiterTables({ navigation }) {
 
     const getStatusStyles = (status) => {
         switch (status) {
+            case 'READY':
+                return {
+                    borderColor: COLORS.success,
+                    borderWidth: 2,
+                    circleBg: 'rgba(82, 214, 129, 0.12)',
+                    textColor: COLORS.success,
+                    dotColor: COLORS.success,
+                    text: t('table_ready'),
+                };
             case 'OCCUPIED':
                 return {
                     borderColor: COLORS.primary,
@@ -205,7 +227,7 @@ export default function WaiterTables({ navigation }) {
                     circleBg: 'rgba(255, 107, 107, 0.1)',
                     textColor: COLORS.primary,
                     dotColor: COLORS.danger,
-                    text: 'Занят',
+                    text: t('table_busy'),
                 };
             case 'RESERVED':
                 return {
@@ -214,7 +236,7 @@ export default function WaiterTables({ navigation }) {
                     circleBg: 'rgba(247, 183, 49, 0.1)',
                     textColor: COLORS.warning,
                     dotColor: COLORS.warning,
-                    text: 'Бронь',
+                    text: t('table_booking'),
                 };
             default:
                 return {
@@ -223,13 +245,13 @@ export default function WaiterTables({ navigation }) {
                     circleBg: COLORS.backgroundLight,
                     textColor: COLORS.textDark,
                     dotColor: COLORS.success,
-                    text: 'Свободен',
+                    text: t('table_free'),
                 };
         }
     };
 
     const handleTablePress = (table) => {
-        if (table.status === 'AVAILABLE') {
+        if (table.status !== 'RESERVED') {
             navigation.navigate('OrderCreation', { tableNumber: table.number, tableId: table.id });
         }
     };
@@ -273,7 +295,7 @@ export default function WaiterTables({ navigation }) {
                             </Text>
                         </View>
 
-                        {item.status === 'OCCUPIED' || item.status === 'RESERVED' ? (
+                        {item.status === 'OCCUPIED' || item.status === 'READY' || item.status === 'RESERVED' ? (
                             <Text style={styles.boldLabel}>{item.label}</Text>
                         ) : (
                             <Text style={styles.mutedLabel}>{item.label}</Text>
@@ -281,10 +303,17 @@ export default function WaiterTables({ navigation }) {
 
                         {item.subLabel ? (
                             <View style={styles.subLabelRow}>
-                                {item.status === 'OCCUPIED' && (
+                                {(item.status === 'OCCUPIED' || item.status === 'READY') && (
                                     <MaterialIcons name="schedule" size={12} color={COLORS.textMuted} />
                                 )}
                                 <Text style={styles.mutedLabelSmall}>{item.subLabel}</Text>
+                            </View>
+                        ) : null}
+
+                        {item.status === 'READY' ? (
+                            <View style={styles.readyHintPill}>
+                                <MaterialIcons name="touch-app" size={13} color={COLORS.success} />
+                                <Text style={styles.readyHintText}>{t('table_open_hint')}</Text>
                             </View>
                         ) : null}
                     </View>
@@ -297,7 +326,7 @@ export default function WaiterTables({ navigation }) {
         <SafeAreaView style={styles.container}>
             <Animated.View style={[styles.header, { opacity: fadeAnim, transform: [{ translateY }] }]}>
                 <View style={{ width: 40 }} />
-                <Text style={styles.headerTitle}>Столики</Text>
+                <Text style={styles.headerTitle}>{t('waiter_tables_title')}</Text>
                 <TouchableOpacity style={styles.headerBtn}>
                     <MaterialIcons name="tune" size={24} color={COLORS.textDark} />
                 </TouchableOpacity>
@@ -309,13 +338,13 @@ export default function WaiterTables({ navigation }) {
                     showsHorizontalScrollIndicator={false}
                     contentContainerStyle={styles.filtersContainer}
                 >
-                    {FILTERS.map((filter, index) => {
-                        const isActive = activeFilter === filter;
+                    {filters.map((filter, index) => {
+                        const isActive = activeFilter === filter.key;
                         return (
                             <TouchableOpacity
                                 key={index}
                                 activeOpacity={0.7}
-                                onPress={() => setActiveFilter(filter)}
+                                onPress={() => setActiveFilter(filter.key)}
                                 style={[
                                     styles.filterPill,
                                     isActive ? styles.filterPillActive : styles.filterPillInactive,
@@ -327,7 +356,7 @@ export default function WaiterTables({ navigation }) {
                                         isActive ? styles.filterTextActive : styles.filterTextInactive,
                                     ]}
                                 >
-                                    {filter}
+                                    {filter.label}
                                 </Text>
                             </TouchableOpacity>
                         );
@@ -348,22 +377,22 @@ export default function WaiterTables({ navigation }) {
                 {loading && (
                     <View style={styles.emptyWrap}>
                         <MaterialIcons name="hourglass-empty" size={48} color={COLORS.textMuted} />
-                        <Text style={styles.emptyTitle}>Загрузка столов...</Text>
+                        <Text style={styles.emptyTitle}>{t('tables_loading')}</Text>
                     </View>
                 )}
 
                 {!loading && error ? (
                     <TouchableOpacity style={styles.emptyWrap} activeOpacity={0.8} onPress={fetchTables}>
                         <MaterialIcons name="wifi-off" size={48} color={COLORS.textMuted} />
-                        <Text style={styles.emptyTitle}>{error}</Text>
-                        <Text style={styles.emptySubTitle}>Нажмите, чтобы попробовать снова</Text>
+                        <Text style={styles.emptyTitle}>{t('tables_load_failed')}</Text>
+                        <Text style={styles.emptySubTitle}>{t('tap_to_retry')}</Text>
                     </TouchableOpacity>
                 ) : null}
 
                 {!loading && !error && getFilteredTables().length === 0 && (
                     <View style={styles.emptyWrap}>
                         <MaterialIcons name="table-restaurant" size={48} color={COLORS.textMuted} />
-                        <Text style={styles.emptyTitle}>Столы не найдены</Text>
+                        <Text style={styles.emptyTitle}>{t('no_tables_found')}</Text>
                     </View>
                 )}
             </ScrollView>
@@ -512,6 +541,21 @@ const styles = StyleSheet.create({
     mutedLabelSmall: {
         fontSize: 12,
         color: COLORS.textMuted,
+    },
+    readyHintPill: {
+        marginTop: 8,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        paddingHorizontal: 10,
+        paddingVertical: 5,
+        borderRadius: 999,
+        backgroundColor: 'rgba(82, 214, 129, 0.12)',
+    },
+    readyHintText: {
+        fontSize: 11,
+        fontWeight: '700',
+        color: COLORS.success,
     },
     emptyWrap: {
         paddingVertical: 56,

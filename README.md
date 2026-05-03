@@ -61,3 +61,4 @@ Use the credentials from your seeded data:
 ## 📚 Documentation
 
 See `MOBILE_APP_GUIDE.md` for complete documentation.
+# waitly-mobile

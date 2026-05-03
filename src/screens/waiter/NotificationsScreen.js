@@ -81,7 +81,9 @@ export default function NotificationsScreen({ navigation }) {
                             <View style={styles.cardBody}>
                                 <Text style={styles.cardTitle}>{item.title}</Text>
                                 <Text style={styles.cardText}>{item.message}</Text>
-                                <Text style={styles.cardMeta}>{formatDateTime(item.createdAt)}</Text>
+                                {item.createdAt ? (
+                                    <Text style={styles.cardMeta}>{formatDateTime(item.createdAt)}</Text>
+                                ) : null}
                             </View>
                             {!item.read && <View style={styles.unreadDot} />}
                         </TouchableOpacity>
