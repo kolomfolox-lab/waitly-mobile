@@ -1,64 +1,79 @@
-# Waitly Mobile App - Quick Start
+# Waitly Mobile
 
-## 📱 Setup
+React Native + Expo app for restaurant staff:
+
+- waiter table flow
+- manager dashboard
+- owner/manager inventory view
+- kitchen display system (KDS) for chefs and cooks
+
+## Setup
 
 ```bash
-cd waitly-mobile
-
-# Install dependencies
 npm install
-
-# Start development server
 npm start
 ```
 
-## 🚀 Running the App
+Run on a device:
 
-### Android
 ```bash
 npm run android
-```
-
-### iOS (Mac only)
-```bash
 npm run ios
-```
-
-### Web
-```bash
 npm run web
 ```
 
-## 📝 Features Implemented
+## Production API
 
-✅ Login screen with phone number authentication
-✅ Dashboard with shift management
-✅ Table list view
-✅ JWT token auto-refresh
-✅ API integration with backend
+The app points to:
 
-## 🔧 Configuration
-
-Edit `services/api.js` and change `BASE_URL` to your backend URL:
-
-```javascript
-const BASE_URL = 'https://your-backend-url.com';
+```text
+https://api.moonlauncher.org/api/v1
 ```
 
-## 📱 Test Credentials
+Main API client:
 
-Use the credentials from your seeded data:
-- Phone: +998901234567
-- Password: test123
+```text
+src/api/client.js
+```
 
-## 🎯 Next Steps
+Legacy screens still using the old client should use:
 
-1. Install Expo Go app on your phone
-2. Scan QR code from `npm start`
-3. Test login and features
-4. Build production app with `eas build`
+```text
+services/api.js
+```
 
-## 📚 Documentation
+Both clients refresh JWT tokens and clear local auth on 403.
 
 See `MOBILE_APP_GUIDE.md` for complete documentation.
-# waitly-mobile
+
+## Roles
+
+- `WAITER`: waiter dashboard, tables, order creation
+- `CHEF` / `COOK`: kitchen display system
+- `MANAGER` / legacy `HEAD_WAITER`: manager dashboard, staff, inventory
+- `RESTAURANT_OWNER`: owner dashboard, tables, staff, inventory
+
+## KDS Flow
+
+The kitchen board follows the backend state machine:
+
+```text
+CREATED -> ACCEPTED -> COOKING -> READY
+```
+
+Actions:
+
+- `Claim`: calls `/core/orders/:id/accept/`
+- `Start cooking`: calls `/core/orders/:id/cooking/`
+- `Ready`: calls `/core/orders/:id/ready/`
+
+The board auto-refreshes every 10 seconds, vibrates on new orders, highlights late orders, and uses a two/three-column tablet grid for Galaxy Tab A9/A9+.
+
+## Quick QA
+
+1. Login as `CHEF` or `COOK`.
+2. Create a waiter or guest order.
+3. Confirm it appears on KDS within 10 seconds.
+4. Tap `Claim`, then `Start cooking`, then `Ready`.
+5. Confirm the owner/waiter panels see the status updates.
+6. Rotate an 8.7" or 11" tablet and confirm cards stay readable.
