@@ -1,285 +1,290 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-    View,
-    Text,
-    StyleSheet,
-    TouchableOpacity,
+    ActivityIndicator,
+    Alert,
+    Animated,
+    FlatList,
     RefreshControl,
     SafeAreaView,
-    ScrollView,
-    Animated,
-    Easing,
-    TextInput,
-    Image,
-    Switch
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    useWindowDimensions,
+    View,
 } from 'react-native';
-import { useAuth } from '../../context/AuthContext';
 import { MaterialIcons } from '@expo/vector-icons';
+import { useAuth } from '../../context/AuthContext';
+import {
+    acceptOrder,
+    fetchActiveOrders,
+    markOrderReady,
+    startCookingOrder,
+} from '../../api/orders';
+import { formatElapsed, formatMoney, formatOrderItems, normalizeOrders } from '../../utils/orderFormat';
+import { getDeviceLayout, getGridItemWidth } from '../../utils/responsive';
+import { getKitchenAction, getStatusLabel, getUrgency, ORDER_STATUS } from '../../utils/orderStatus';
+import { shouldAlertForOrders, triggerNewOrderAlert } from '../../services/kitchenAlerts';
 
 const COLORS = {
-    primary: '#ff6b6b',
-    primaryLight: 'rgba(255, 107, 107, 0.1)',
-    backgroundLight: '#f8f5f5',
-    success: '#52D681',
-    warning: '#F7B731',
-    danger: '#EE5A6F',
-    white: '#FFFFFF',
-    textDark: '#0f172a',
-    textMuted: '#94a3b8',
-    slate800: '#1e293b',
-    slate700: '#334155',
-    slate300: '#cbd5e1',
-    slate200: '#e2e8f0',
-    slate100: '#f1f5f9',
+    primary: '#ff7a59',
+    primarySoft: 'rgba(255, 122, 89, 0.15)',
+    background: '#0b1320',
+    card: '#121d2b',
+    cardRaised: '#172638',
+    border: '#26384c',
+    text: '#f8fafc',
+    muted: '#9aa8b7',
+    success: '#2dd4bf',
+    warning: '#fbbf24',
+    danger: '#fb7185',
+    dangerSoft: 'rgba(251, 113, 133, 0.14)',
+    white: '#ffffff',
 };
 
-const CATEGORIES = ['Все', 'Горячее', 'Салаты', 'Напитки', 'Супы'];
+const REFRESH_INTERVAL_MS = 10000;
 
-export default function ChefDashboard({ navigation }) {
+export default function ChefDashboard() {
     const { user, logout } = useAuth();
+    const { width } = useWindowDimensions();
+    const layout = useMemo(() => getDeviceLayout(width), [width]);
+    const cardWidth = useMemo(
+        () => getGridItemWidth(width, layout.columns, layout.gutter),
+        [width, layout.columns, layout.gutter]
+    );
+
+    const [orders, setOrders] = useState([]);
+    const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
-    const [activeCategory, setActiveCategory] = useState('Все');
-    const [searchQuery, setSearchQuery] = useState('');
+    const [busyOrderId, setBusyOrderId] = useState(null);
+    const [lastAlertAt, setLastAlertAt] = useState(null);
+    const [clockTick, setClockTick] = useState(0);
+    const seenOrderIds = useRef(new Set());
+    const pulse = useRef(new Animated.Value(0)).current;
 
-    // Mock Menu Items based on design
-    const [menuItems, setMenuItems] = useState([
-        { id: 1, name: 'Стейк Рибай', desc: 'С овощами гриль и соусом', price: 2400, category: 'Горячее', isAvailable: true, inStock: 12, image: 'https://images.unsplash.com/photo-1594041680534-e8c8cdebd659?w=500&auto=format&fit=crop&q=60' },
-        { id: 2, name: 'Паста Карбонара', desc: 'Классическая итальянская', price: 850, category: 'Горячее', isAvailable: true, inStock: 45, image: 'https://images.unsplash.com/photo-1612874742237-6526221588e3?w=500&auto=format&fit=crop&q=60' },
-        { id: 3, name: 'Том Ям', desc: 'Острый тайский суп с морепродуктами', price: 950, category: 'Супы', isAvailable: false, inStock: 0, image: 'https://images.unsplash.com/photo-1548943487-a2e4b43b485d?w=500&auto=format&fit=crop&q=60' },
-        { id: 4, name: 'Салат Цезарь', desc: 'С куриным филе', price: 650, category: 'Салаты', isAvailable: true, inStock: 20, image: 'https://images.unsplash.com/photo-1550304943-4f24f54ddde9?w=500&auto=format&fit=crop&q=60' },
-    ]);
-
-    // Animations
-    const fadeAnim = useRef(new Animated.Value(0)).current;
-    const translateY = useRef(new Animated.Value(20)).current;
-
-    // Staggered list animations for items
-    const [itemAnims, setItemAnims] = useState([]);
-
-    useEffect(() => {
-        Animated.parallel([
-            Animated.timing(fadeAnim, {
-                toValue: 1,
-                duration: 500,
-                useNativeDriver: true,
-            }),
-            Animated.timing(translateY, {
-                toValue: 0,
-                duration: 500,
-                easing: Easing.out(Easing.cubic),
-                useNativeDriver: true,
-            })
-        ]).start();
-    }, []);
-
-    const filteredItems = menuItems.filter(item => {
-        const matchesCategory = activeCategory === 'Все' ? true : item.category === activeCategory;
-        const matchesQuery = item.name.toLowerCase().includes(searchQuery.toLowerCase());
-        return matchesCategory && matchesQuery;
-    });
-
-    useEffect(() => {
-        // Trigger exit/enter animations for list when filter changes
-        const anims = filteredItems.map(() => ({
-            opacity: new Animated.Value(0),
-            scale: new Animated.Value(0.95)
-        }));
-        setItemAnims(anims);
-
-        if (filteredItems.length > 0) {
-            const animations = anims.map((anim, index) => {
-                return Animated.parallel([
-                    Animated.timing(anim.opacity, {
-                        toValue: 1,
-                        duration: 300,
-                        delay: index * 50,
-                        useNativeDriver: true,
-                    }),
-                    Animated.spring(anim.scale, {
-                        toValue: 1,
-                        friction: 7,
-                        tension: 40,
-                        delay: index * 50,
-                        useNativeDriver: true,
-                    })
-                ]);
-            });
-            Animated.parallel(animations).start();
+    const loadOrders = useCallback(async ({ silent = false } = {}) => {
+        if (!silent) {
+            setRefreshing(true);
         }
-    }, [activeCategory, searchQuery]);
 
-    const onRefresh = React.useCallback(() => {
-        setRefreshing(true);
-        setTimeout(() => setRefreshing(false), 1200);
+        try {
+            const payload = await fetchActiveOrders();
+            const nextOrders = normalizeOrders(payload);
+
+            if (shouldAlertForOrders(seenOrderIds.current, nextOrders)) {
+                triggerNewOrderAlert();
+                setLastAlertAt(new Date());
+            }
+
+            seenOrderIds.current = new Set(nextOrders.map((order) => order.id));
+            setOrders(nextOrders);
+        } catch (error) {
+            console.error('Failed to load kitchen orders:', error);
+            if (!silent) {
+                Alert.alert('Kitchen offline', 'Could not load orders. Check connection and try again.');
+            }
+        } finally {
+            setLoading(false);
+            setRefreshing(false);
+        }
     }, []);
 
-    const toggleAvailability = (id) => {
-        setMenuItems(prev => prev.map(item => {
-            if (item.id === id) {
-                // Return new object with toggled availability
-                return { ...item, isAvailable: !item.isAvailable };
+    useEffect(() => {
+        loadOrders();
+        const refreshTimer = setInterval(() => loadOrders({ silent: true }), REFRESH_INTERVAL_MS);
+        const clockTimer = setInterval(() => setClockTick((value) => value + 1), 30000);
+
+        return () => {
+            clearInterval(refreshTimer);
+            clearInterval(clockTimer);
+        };
+    }, [loadOrders]);
+
+    useEffect(() => {
+        Animated.loop(
+            Animated.sequence([
+                Animated.timing(pulse, { toValue: 1, duration: 650, useNativeDriver: true }),
+                Animated.timing(pulse, { toValue: 0, duration: 650, useNativeDriver: true }),
+            ])
+        ).start();
+    }, [pulse]);
+
+    const stats = useMemo(() => {
+        const open = orders.filter((order) => order.status === ORDER_STATUS.CREATED).length;
+        const cooking = orders.filter((order) => order.status === ORDER_STATUS.ACCEPTED || order.status === ORDER_STATUS.COOKING).length;
+        const ready = orders.filter((order) => order.status === ORDER_STATUS.READY).length;
+        const urgent = orders.filter((order) => ['late', 'critical'].includes(getUrgency(order))).length;
+        return { open, cooking, ready, urgent };
+    }, [orders, clockTick]);
+
+    const handleAction = async (order) => {
+        const action = getKitchenAction(order.status);
+        if (!action) {
+            return;
+        }
+
+        setBusyOrderId(order.id);
+        try {
+            if (action.nextStatus === ORDER_STATUS.ACCEPTED) {
+                await acceptOrder(order.id);
+            } else if (action.nextStatus === ORDER_STATUS.COOKING) {
+                await startCookingOrder(order.id);
+            } else if (action.nextStatus === ORDER_STATUS.READY) {
+                await markOrderReady(order.id);
             }
-            return item;
-        }));
+            await loadOrders({ silent: true });
+        } catch (error) {
+            console.error('Failed to update order status:', error);
+            Alert.alert('Status not changed', 'Order was probably updated by another cook. Refreshing now.');
+            await loadOrders({ silent: true });
+        } finally {
+            setBusyOrderId(null);
+        }
     };
+
+    const renderOrder = ({ item }) => {
+        const action = getKitchenAction(item.status);
+        const urgency = getUrgency(item);
+        const isBusy = busyOrderId === item.id;
+        const isCancelled = item.status === ORDER_STATUS.CANCELLED;
+        const scale = urgency === 'critical'
+            ? pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.025] })
+            : 1;
+
+        return (
+            <Animated.View style={[
+                styles.orderCard,
+                { width: cardWidth, minHeight: layout.cardMinHeight, transform: [{ scale }] },
+                urgency === 'warning' && styles.orderCardWarning,
+                urgency === 'late' && styles.orderCardLate,
+                urgency === 'critical' && styles.orderCardCritical,
+                isCancelled && styles.orderCardCancelled,
+            ]}>
+                <View style={styles.orderTopRow}>
+                    <View style={styles.tableBadge}>
+                        <MaterialIcons name="table-restaurant" size={18} color={COLORS.white} />
+                        <Text style={styles.tableText}>Table {item.table_number || '-'}</Text>
+                    </View>
+                    <View style={[styles.statusPill, isCancelled && styles.statusPillCancelled]}>
+                        <Text style={styles.statusText}>{getStatusLabel(item.status)}</Text>
+                    </View>
+                </View>
+
+                <View style={styles.timerRow}>
+                    <Text style={[styles.elapsed, isCancelled && styles.cancelledText]}>
+                        {formatElapsed(item.created_at)}
+                    </Text>
+                    <Text style={styles.target}>target {item.estimated_time || 15}m</Text>
+                </View>
+
+                <Text style={[styles.items, isCancelled && styles.cancelledText]} numberOfLines={4}>
+                    {formatOrderItems(item.items)}
+                </Text>
+
+                <View style={styles.metaRow}>
+                    <Text style={styles.metaText}>Waiter: {item.waiter_name || 'Unassigned'}</Text>
+                    <Text style={styles.metaText}>{formatMoney(item.total_amount)}</Text>
+                </View>
+
+                {isCancelled ? (
+                    <View style={styles.cancelledBanner}>
+                        <MaterialIcons name="block" size={18} color={COLORS.danger} />
+                        <Text style={styles.cancelledBannerText}>Cancelled - do not cook</Text>
+                    </View>
+                ) : action ? (
+                    <TouchableOpacity
+                        style={[styles.actionButton, styles[`action_${action.tone}`], isBusy && styles.actionDisabled]}
+                        onPress={() => handleAction(item)}
+                        disabled={isBusy}
+                    >
+                        {isBusy ? (
+                            <ActivityIndicator color={COLORS.white} />
+                        ) : (
+                            <>
+                                <MaterialIcons name="bolt" size={20} color={COLORS.white} />
+                                <Text style={styles.actionText}>{action.label}</Text>
+                            </>
+                        )}
+                    </TouchableOpacity>
+                ) : (
+                    <View style={styles.readyBanner}>
+                        <MaterialIcons name="room-service" size={18} color={COLORS.success} />
+                        <Text style={styles.readyBannerText}>Waiting for waiter pickup</Text>
+                    </View>
+                )}
+            </Animated.View>
+        );
+    };
+
+    if (loading) {
+        return (
+            <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color={COLORS.primary} />
+                <Text style={styles.loadingText}>Loading kitchen board...</Text>
+            </View>
+        );
+    }
 
     return (
         <SafeAreaView style={styles.container}>
-            {/* Header */}
-            <Animated.View style={[styles.header, { opacity: fadeAnim, transform: [{ translateY }] }]}>
-                <View style={styles.headerLeft}>
-                    <TouchableOpacity style={styles.profileBtn} onPress={logout}>
-                        <Text style={styles.profileInitials}>{user?.full_name?.charAt(0) || 'Ш'}</Text>
-                    </TouchableOpacity>
-                    <View>
-                        <Text style={styles.greeting}>Управление меню,</Text>
-                        <Text style={styles.userName}>{user?.full_name?.split(' ')[0] || 'Шеф'}</Text>
-                    </View>
+            <View style={styles.header}>
+                <View>
+                    <Text style={styles.kicker}>KDS Control</Text>
+                    <Text style={styles.title}>Kitchen board</Text>
+                    <Text style={styles.subtitle}>
+                        {user?.full_name || 'Cook'} - auto refresh every 10 seconds
+                    </Text>
                 </View>
-                <TouchableOpacity style={styles.iconBtn}>
-                    <MaterialIcons name="notifications-none" size={26} color={COLORS.textDark} />
-                </TouchableOpacity>
-            </Animated.View>
-
-            {/* Stop List Summary Card */}
-            <Animated.View style={[styles.summaryCardWrapper, { opacity: fadeAnim, transform: [{ translateY }] }]}>
-                <View style={[styles.summaryCard, { backgroundColor: COLORS.textDark }]}>
-                    <View style={styles.summaryLeft}>
-                        <Text style={styles.summaryTitle}>Блюда в СТОПе</Text>
-                        <Text style={styles.summaryValue}>{menuItems.filter(i => !i.isAvailable).length}</Text>
-                        <TouchableOpacity style={styles.summaryActionBtn}>
-                            <Text style={styles.summaryActionText}>Посмотреть все</Text>
-                        </TouchableOpacity>
-                    </View>
-                    <View style={styles.summaryRight}>
-                        <View style={styles.summaryIconBox}>
-                            <MaterialIcons name="block" size={32} color={COLORS.danger} />
-                        </View>
-                    </View>
-                </View>
-            </Animated.View>
-
-            {/* Search and Filters */}
-            <Animated.View style={[styles.controlsArea, { opacity: fadeAnim }]}>
-                <View style={styles.searchBox}>
-                    <MaterialIcons name="search" size={22} color={COLORS.slate400} />
-                    <TextInput
-                        style={styles.searchInput}
-                        placeholder="Найти блюдо..."
-                        placeholderTextColor={COLORS.slate400}
-                        value={searchQuery}
-                        onChangeText={setSearchQuery}
-                    />
-                </View>
-
-                <View style={styles.categoriesWrapper}>
-                    <ScrollView
-                        horizontal
-                        showsHorizontalScrollIndicator={false}
-                        contentContainerStyle={styles.categoriesContainer}
-                    >
-                        {CATEGORIES.map((cat, index) => {
-                            const isActive = activeCategory === cat;
-                            return (
-                                <TouchableOpacity
-                                    key={index}
-                                    activeOpacity={0.7}
-                                    onPress={() => setActiveCategory(cat)}
-                                    style={[
-                                        styles.categoryPill,
-                                        isActive ? styles.categoryPillActive : styles.categoryPillInactive
-                                    ]}
-                                >
-                                    <Text style={[
-                                        styles.categoryText,
-                                        isActive ? styles.categoryTextActive : styles.categoryTextInactive
-                                    ]}>
-                                        {cat}
-                                    </Text>
-                                </TouchableOpacity>
-                            );
-                        })}
-                    </ScrollView>
-                </View>
-            </Animated.View>
-
-            {/* Menu List */}
-            <ScrollView
-                style={styles.mainScroll}
-                contentContainerStyle={styles.mainScrollContent}
-                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.primary} />}
-                showsVerticalScrollIndicator={false}
-            >
-                {filteredItems.map((item, index) => {
-                    const anim = itemAnims[index] || { opacity: 1, scale: 1 };
-
-                    return (
-                        <Animated.View
-                            key={item.id}
-                            style={[
-                                styles.menuItemWrapper,
-                                {
-                                    opacity: anim.opacity,
-                                    transform: [{ scale: anim.scale }]
-                                }
-                            ]}
-                        >
-                            <View style={[styles.menuCard, !item.isAvailable && styles.menuCardUnavailable]}>
-                                <Image
-                                    source={{ uri: item.image }}
-                                    style={[styles.menuItemImage, !item.isAvailable && styles.imageUnavailable]}
-                                />
-
-                                <View style={styles.menuItemInfo}>
-                                    <View>
-                                        <Text style={styles.menuItemName} numberOfLines={1}>{item.name}</Text>
-                                        <Text style={styles.menuItemDesc} numberOfLines={1}>{item.desc}</Text>
-                                    </View>
-
-                                    <View style={styles.menuItemFooter}>
-                                        <View style={styles.stockInfo}>
-                                            <MaterialIcons
-                                                name={item.inStock > 0 ? "inventory" : "warning"}
-                                                size={14}
-                                                color={item.inStock > 0 ? COLORS.slate500 : COLORS.warning}
-                                            />
-                                            <Text style={[styles.stockText, item.inStock === 0 && styles.stockWarning]}>
-                                                {item.inStock} в наличии
-                                            </Text>
-                                        </View>
-
-                                        <View style={styles.switchWrapper}>
-                                            <Switch
-                                                trackColor={{ false: COLORS.slate200, true: COLORS.success }}
-                                                thumbColor={COLORS.white}
-                                                ios_backgroundColor={COLORS.slate200}
-                                                onValueChange={() => toggleAvailability(item.id)}
-                                                value={item.isAvailable}
-                                            />
-                                        </View>
-                                    </View>
-                                </View>
-                            </View>
-                        </Animated.View>
-                    );
-                })}
-            </ScrollView>
-
-            {/* Bottom Nav matches Chef View */}
-            <View style={styles.bottomNav}>
-                <TouchableOpacity style={styles.navItem}>
-                    <MaterialIcons name="grid-view" size={24} color={COLORS.primary} />
-                    <Text style={styles.navLabelActive}>Меню</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.navItem}>
-                    <MaterialIcons name="av-timer" size={24} color={COLORS.slate400} />
-                    <Text style={styles.navLabel}>Заказы</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.navItem}>
-                    <MaterialIcons name="insert-chart-outlined" size={24} color={COLORS.slate400} />
-                    <Text style={styles.navLabel}>Статистика</Text>
+                <TouchableOpacity style={styles.logoutButton} onPress={logout}>
+                    <MaterialIcons name="logout" size={18} color={COLORS.white} />
+                    <Text style={styles.logoutText}>Logout</Text>
                 </TouchableOpacity>
             </View>
+
+            <View style={styles.statsRow}>
+                <View style={styles.statCard}>
+                    <Text style={styles.statValue}>{stats.open}</Text>
+                    <Text style={styles.statLabel}>New</Text>
+                </View>
+                <View style={styles.statCard}>
+                    <Text style={styles.statValue}>{stats.cooking}</Text>
+                    <Text style={styles.statLabel}>In work</Text>
+                </View>
+                <View style={styles.statCard}>
+                    <Text style={styles.statValue}>{stats.ready}</Text>
+                    <Text style={styles.statLabel}>Ready</Text>
+                </View>
+                <View style={[styles.statCard, stats.urgent > 0 && styles.statCardUrgent]}>
+                    <Text style={[styles.statValue, stats.urgent > 0 && styles.statValueUrgent]}>{stats.urgent}</Text>
+                    <Text style={styles.statLabel}>Late</Text>
+                </View>
+            </View>
+
+            {lastAlertAt && (
+                <View style={styles.alertStrip}>
+                    <MaterialIcons name="notifications-active" size={18} color={COLORS.primary} />
+                    <Text style={styles.alertText}>New order alert at {lastAlertAt.toLocaleTimeString()}</Text>
+                </View>
+            )}
+
+            <FlatList
+                key={layout.columns}
+                data={orders}
+                renderItem={renderOrder}
+                keyExtractor={(item) => item.id}
+                numColumns={layout.columns}
+                columnWrapperStyle={layout.columns > 1 ? { gap: layout.gutter } : null}
+                contentContainerStyle={styles.listContent}
+                refreshControl={
+                    <RefreshControl refreshing={refreshing} onRefresh={() => loadOrders()} tintColor={COLORS.primary} />
+                }
+                ListEmptyComponent={
+                    <View style={styles.emptyState}>
+                        <MaterialIcons name="restaurant" size={64} color={COLORS.muted} />
+                        <Text style={styles.emptyTitle}>Kitchen is clear</Text>
+                        <Text style={styles.emptyText}>New guest and waiter orders will appear here automatically.</Text>
+                    </View>
+                }
+            />
         </SafeAreaView>
     );
 }
@@ -287,265 +292,285 @@ export default function ChefDashboard({ navigation }) {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: COLORS.backgroundLight,
+        backgroundColor: COLORS.background,
+    },
+    loadingContainer: {
+        flex: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: COLORS.background,
+    },
+    loadingText: {
+        marginTop: 12,
+        color: COLORS.muted,
+        fontWeight: '700',
     },
     header: {
+        paddingHorizontal: 20,
+        paddingVertical: 18,
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        paddingHorizontal: 20,
-        paddingTop: 16,
-        paddingBottom: 16,
+        borderBottomWidth: 1,
+        borderBottomColor: COLORS.border,
     },
-    headerLeft: {
+    kicker: {
+        color: '#8bd8ff',
+        fontSize: 11,
+        fontWeight: '900',
+        letterSpacing: 3,
+        textTransform: 'uppercase',
+    },
+    title: {
+        color: COLORS.text,
+        fontSize: 34,
+        fontWeight: '900',
+        letterSpacing: -1,
+    },
+    subtitle: {
+        color: COLORS.muted,
+        fontSize: 14,
+        marginTop: 4,
+    },
+    logoutButton: {
         flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        backgroundColor: COLORS.cardRaised,
+        borderWidth: 1,
+        borderColor: COLORS.border,
+        paddingHorizontal: 14,
+        paddingVertical: 12,
+        borderRadius: 999,
+    },
+    logoutText: {
+        color: COLORS.white,
+        fontWeight: '800',
+    },
+    statsRow: {
+        flexDirection: 'row',
+        gap: 10,
+        paddingHorizontal: 16,
+        paddingTop: 14,
+    },
+    statCard: {
+        flex: 1,
+        backgroundColor: COLORS.card,
+        borderWidth: 1,
+        borderColor: COLORS.border,
+        borderRadius: 16,
+        padding: 14,
+    },
+    statCardUrgent: {
+        borderColor: COLORS.danger,
+        backgroundColor: COLORS.dangerSoft,
+    },
+    statValue: {
+        color: COLORS.text,
+        fontSize: 28,
+        fontWeight: '900',
+    },
+    statValueUrgent: {
+        color: COLORS.danger,
+    },
+    statLabel: {
+        color: COLORS.muted,
+        fontWeight: '800',
+        marginTop: 2,
+    },
+    alertStrip: {
+        marginHorizontal: 16,
+        marginTop: 12,
+        borderRadius: 14,
+        padding: 12,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        backgroundColor: COLORS.primarySoft,
+        borderWidth: 1,
+        borderColor: COLORS.primary,
+    },
+    alertText: {
+        color: COLORS.text,
+        fontWeight: '800',
+    },
+    listContent: {
+        padding: 16,
+        paddingBottom: 40,
+        gap: 16,
+    },
+    orderCard: {
+        backgroundColor: COLORS.card,
+        borderWidth: 1,
+        borderColor: COLORS.border,
+        borderRadius: 24,
+        padding: 18,
+        marginBottom: 16,
+    },
+    orderCardWarning: {
+        borderColor: COLORS.warning,
+    },
+    orderCardLate: {
+        borderColor: COLORS.danger,
+    },
+    orderCardCritical: {
+        borderColor: COLORS.danger,
+        backgroundColor: '#221321',
+    },
+    orderCardCancelled: {
+        opacity: 0.8,
+        borderColor: COLORS.danger,
+    },
+    orderTopRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
         alignItems: 'center',
         gap: 12,
     },
-    profileBtn: {
-        width: 44,
-        height: 44,
-        borderRadius: 22,
-        backgroundColor: COLORS.primaryLight,
-        justifyContent: 'center',
+    tableBadge: {
+        flexDirection: 'row',
         alignItems: 'center',
+        gap: 8,
+        backgroundColor: COLORS.primary,
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        borderRadius: 999,
     },
-    profileInitials: {
-        color: COLORS.primary,
+    tableText: {
+        color: COLORS.white,
         fontSize: 18,
-        fontWeight: 'bold',
+        fontWeight: '900',
     },
-    greeting: {
-        fontSize: 13,
-        color: COLORS.textMuted,
-        marginBottom: 2,
-    },
-    userName: {
-        fontSize: 18,
-        fontWeight: '700',
-        color: COLORS.textDark,
-    },
-    iconBtn: {
-        width: 44,
-        height: 44,
-        borderRadius: 22,
-        backgroundColor: COLORS.white,
-        justifyContent: 'center',
-        alignItems: 'center',
+    statusPill: {
+        backgroundColor: COLORS.cardRaised,
         borderWidth: 1,
-        borderColor: COLORS.slate100,
+        borderColor: COLORS.border,
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        borderRadius: 999,
     },
-    summaryCardWrapper: {
-        paddingHorizontal: 16,
-        marginBottom: 16,
+    statusPillCancelled: {
+        borderColor: COLORS.danger,
+        backgroundColor: COLORS.dangerSoft,
     },
-    summaryCard: {
-        borderRadius: 20,
-        padding: 20,
+    statusText: {
+        color: COLORS.text,
+        fontWeight: '900',
+        textTransform: 'uppercase',
+        fontSize: 11,
+        letterSpacing: 1,
+    },
+    timerRow: {
+        flexDirection: 'row',
+        alignItems: 'flex-end',
+        justifyContent: 'space-between',
+        marginTop: 18,
+    },
+    elapsed: {
+        color: COLORS.text,
+        fontSize: 44,
+        fontWeight: '900',
+        letterSpacing: -1,
+    },
+    target: {
+        color: COLORS.muted,
+        fontWeight: '800',
+        marginBottom: 8,
+    },
+    items: {
+        color: COLORS.text,
+        fontSize: 20,
+        fontWeight: '800',
+        lineHeight: 28,
+        marginTop: 10,
+    },
+    cancelledText: {
+        textDecorationLine: 'line-through',
+        color: COLORS.muted,
+    },
+    metaRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
+        gap: 12,
+        marginTop: 16,
+        paddingTop: 14,
+        borderTopWidth: 1,
+        borderTopColor: COLORS.border,
+    },
+    metaText: {
+        color: COLORS.muted,
+        fontWeight: '700',
+    },
+    actionButton: {
+        marginTop: 18,
+        borderRadius: 18,
+        paddingVertical: 16,
         alignItems: 'center',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 6 },
-        shadowOpacity: 0.15,
-        shadowRadius: 10,
-        elevation: 6,
-    },
-    summaryLeft: {
-        flex: 1,
-    },
-    summaryTitle: {
-        color: 'rgba(255,255,255,0.7)',
-        fontSize: 14,
-        fontWeight: '500',
-        marginBottom: 4,
-    },
-    summaryValue: {
-        color: COLORS.white,
-        fontSize: 32,
-        fontWeight: 'bold',
-        marginBottom: 12,
-    },
-    summaryActionBtn: {
-        backgroundColor: 'rgba(255,255,255,0.1)',
-        paddingHorizontal: 16,
-        paddingVertical: 8,
-        borderRadius: 8,
-        alignSelf: 'flex-start',
-    },
-    summaryActionText: {
-        color: COLORS.white,
-        fontSize: 13,
-        fontWeight: '600',
-    },
-    summaryIconBox: {
-        width: 60,
-        height: 60,
-        borderRadius: 30,
-        backgroundColor: 'rgba(238, 90, 111, 0.15)',
         justifyContent: 'center',
-        alignItems: 'center',
-    },
-    controlsArea: {
-        marginBottom: 4,
-    },
-    searchBox: {
         flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: COLORS.white,
-        borderRadius: 16,
-        paddingHorizontal: 16,
-        height: 52,
-        marginHorizontal: 16,
-        marginBottom: 16,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.03,
-        shadowRadius: 5,
-        elevation: 1,
-        borderWidth: 1,
-        borderColor: COLORS.slate100,
-    },
-    searchInput: {
-        flex: 1,
-        height: '100%',
-        marginLeft: 12,
-        fontSize: 15,
-        color: COLORS.textDark,
-    },
-    categoriesContainer: {
-        paddingHorizontal: 16,
-        paddingBottom: 8,
         gap: 8,
     },
-    categoryPill: {
-        paddingHorizontal: 20,
-        paddingVertical: 10,
-        borderRadius: 14,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    categoryPillActive: {
+    action_primary: {
         backgroundColor: COLORS.primary,
     },
-    categoryPillInactive: {
-        backgroundColor: COLORS.white,
-        borderWidth: 1,
-        borderColor: COLORS.slate200,
+    action_warning: {
+        backgroundColor: COLORS.warning,
     },
-    categoryText: {
-        fontSize: 14,
-        fontWeight: '600',
+    action_success: {
+        backgroundColor: COLORS.success,
     },
-    categoryTextActive: {
+    actionDisabled: {
+        opacity: 0.6,
+    },
+    actionText: {
         color: COLORS.white,
+        fontSize: 18,
+        fontWeight: '900',
     },
-    categoryTextInactive: {
-        color: COLORS.slate500,
-    },
-    mainScroll: {
-        flex: 1,
-    },
-    mainScrollContent: {
-        paddingHorizontal: 16,
-        paddingTop: 8,
-        paddingBottom: 100, // Bottom nav space
-    },
-    menuItemWrapper: {
-        marginBottom: 12,
-    },
-    menuCard: {
-        backgroundColor: COLORS.white,
-        borderRadius: 16,
-        padding: 12,
+    readyBanner: {
+        marginTop: 18,
         flexDirection: 'row',
-        gap: 16,
-        borderWidth: 1,
-        borderColor: COLORS.slate100,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.03,
-        shadowRadius: 5,
-        elevation: 2,
-    },
-    menuCardUnavailable: {
-        backgroundColor: '#fafafa',
-        borderColor: COLORS.slate200,
-    },
-    menuItemImage: {
-        width: 80,
-        height: 80,
-        borderRadius: 12,
-        backgroundColor: COLORS.slate100,
-    },
-    imageUnavailable: {
-        opacity: 0.5,
-        tintColor: 'gray', // Rough visual cue
-    },
-    menuItemInfo: {
-        flex: 1,
-        justifyContent: 'space-between',
-    },
-    menuItemName: {
-        fontSize: 16,
-        fontWeight: 'bold',
-        color: COLORS.textDark,
-        marginBottom: 4,
-    },
-    menuItemDesc: {
-        fontSize: 12,
-        color: COLORS.slate400,
-    },
-    menuItemFooter: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginTop: 8,
-    },
-    stockInfo: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 4,
-    },
-    stockText: {
-        fontSize: 12,
-        fontWeight: '500',
-        color: COLORS.slate500,
-    },
-    stockWarning: {
-        color: COLORS.warning,
-    },
-    switchWrapper: {
-        transform: [{ scale: 0.9 }],
-    },
-    bottomNav: {
-        position: 'absolute',
-        bottom: 0,
-        left: 0,
-        right: 0,
-        backgroundColor: COLORS.white,
-        borderTopWidth: 1,
-        borderTopColor: 'rgba(0,0,0,0.03)',
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        paddingHorizontal: 24,
-        paddingTop: 16,
-        paddingBottom: 28, // Safe area
-        zIndex: 20,
-    },
-    navItem: {
+        gap: 8,
         alignItems: 'center',
         justifyContent: 'center',
-        gap: 6,
+        backgroundColor: 'rgba(45, 212, 191, 0.12)',
+        borderRadius: 18,
+        paddingVertical: 14,
     },
-    navLabel: {
-        fontSize: 11,
-        fontWeight: '500',
-        color: COLORS.textMuted,
+    readyBannerText: {
+        color: COLORS.success,
+        fontWeight: '900',
     },
-    navLabelActive: {
-        fontSize: 11,
-        fontWeight: '600',
-        color: COLORS.primary,
-    }
+    cancelledBanner: {
+        marginTop: 18,
+        flexDirection: 'row',
+        gap: 8,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: COLORS.dangerSoft,
+        borderRadius: 18,
+        paddingVertical: 14,
+    },
+    cancelledBannerText: {
+        color: COLORS.danger,
+        fontWeight: '900',
+    },
+    emptyState: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 80,
+        paddingHorizontal: 24,
+    },
+    emptyTitle: {
+        color: COLORS.text,
+        fontSize: 28,
+        fontWeight: '900',
+        marginTop: 16,
+    },
+    emptyText: {
+        color: COLORS.muted,
+        textAlign: 'center',
+        marginTop: 8,
+        lineHeight: 22,
+    },
 });
