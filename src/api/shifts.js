@@ -4,7 +4,7 @@ import client from './client';
  * Fetch all active shifts for the restaurant
  */
 export const fetchActiveShifts = async () => {
-    const response = await client.get('/orders/shifts/');
+    const response = await client.get('/core/shifts/');
     return response.data;
 };
 
@@ -12,7 +12,7 @@ export const fetchActiveShifts = async () => {
  * Start a new work shift
  */
 export const startShift = async () => {
-    const response = await client.post('/orders/shifts/start/');
+    const response = await client.post('/core/shifts/start/');
     return response.data;
 };
 
@@ -20,7 +20,7 @@ export const startShift = async () => {
  * End current work shift
  */
 export const endShift = async (shiftId) => {
-    const response = await client.post(`/orders/shifts/${shiftId}/end/`);
+    const response = await client.post(`/core/shifts/${shiftId}/end/`);
     return response.data;
 };
 
@@ -28,6 +28,6 @@ export const endShift = async (shiftId) => {
  * Get current shift statistics
  */
 export const getCurrentShiftStats = async () => {
-    const response = await client.get('/orders/shifts/current_stats/');
+    const response = await client.get('/core/shifts/current_stats/');
     return response.data;
 };
