@@ -29,6 +29,11 @@ const COLORS = {
     white: '#FFFFFF',
     textDark: '#0f172a',
     textMuted: '#94a3b8',
+    slate800: '#1e293b',
+    slate700: '#334155',
+    slate500: '#64748b',
+    slate400: '#94a3b8',
+    slate200: '#e2e8f0',
     slate100: '#f1f5f9',
 };
 

@@ -30,7 +30,7 @@ export default function HeadWaiterDashboard() {
             // Calculate stats
             const activeShifts = shiftsArray.filter(s => !s.ended_at);
             const activeWaiters = activeShifts.filter(s =>
-                s.user?.role === 'WAITER' || s.user?.role === 'HEAD_WAITER'
+                s.user?.role === 'WAITER' || s.user?.role === 'HEAD_WAITER' || s.user?.role === 'MANAGER'
             ).length;
             const activeChefs = activeShifts.filter(s =>
                 s.user?.role === 'CHEF' || s.user?.role === 'COOK'
