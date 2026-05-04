@@ -1,8 +1,8 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Alert } from 'react-native';
 
-// Base URL - change for production
-const BASE_URL = 'http://192.168.31.242:8000'; // Change to your backend URL
+const BASE_URL = 'https://api.moonlauncher.org';
 
 const api = axios.create({
     baseURL: BASE_URL,
@@ -12,47 +12,57 @@ const api = axios.create({
     },
 });
 
-// Request interceptor - add JWT token
+const clearAuthStorage = async () => {
+    await AsyncStorage.multiRemove(['access_token', 'refresh_token', 'user', 'user_role', 'user_data']);
+};
+
 api.interceptors.request.use(
     async (config) => {
         const token = await AsyncStorage.getItem('access_token');
         if (token) {
             config.headers.Authorization = `Bearer ${token}`;
         }
-        console.log(`[API Request] ${config.method.toUpperCase()} ${config.baseURL}${config.url}`, config.data);
         return config;
     },
-    (error) => {
-        console.error('[API Request Error]', error);
-        return Promise.reject(error);
-    }
+    (error) => Promise.reject(error)
 );
 
-// Response interceptor - handle token refresh
 api.interceptors.response.use(
     (response) => response,
     async (error) => {
         const originalRequest = error.config;
 
-        if (error.response?.status === 401 && !originalRequest._retry) {
+        if (error.response?.status === 401 && originalRequest && !originalRequest._retry) {
             originalRequest._retry = true;
 
             try {
                 const refreshToken = await AsyncStorage.getItem('refresh_token');
-                const response = await axios.post(`${BASE_URL}/api/auth/token/refresh/`, {
+                if (!refreshToken) {
+                    throw error;
+                }
+
+                const response = await axios.post(`${BASE_URL}/api/v1/auth/refresh/`, {
                     refresh: refreshToken,
                 });
 
-                const { access } = response.data;
+                const { access, refresh } = response.data;
                 await AsyncStorage.setItem('access_token', access);
+                if (refresh) {
+                    await AsyncStorage.setItem('refresh_token', refresh);
+                }
 
+                originalRequest.headers = originalRequest.headers || {};
                 originalRequest.headers.Authorization = `Bearer ${access}`;
                 return api(originalRequest);
             } catch (refreshError) {
-                // Logout user
-                await AsyncStorage.multiRemove(['access_token', 'refresh_token', 'user']);
+                await clearAuthStorage();
                 return Promise.reject(refreshError);
             }
+        }
+
+        if (error.response?.status === 403) {
+            await clearAuthStorage();
+            Alert.alert('Access limited', error.response?.data?.error || 'Your access has been paused.');
         }
 
         return Promise.reject(error);
