@@ -33,6 +33,14 @@ export const getTables = async () => {
     return response.data; // Paginated: { count, next, previous, results }
 };
 
+export const transferTable = async (tableId, targetWaiterId, note = '') => {
+    const response = await apiClient.post(`/api/v1/core/tables/${tableId}/transfer/`, {
+        target_waiter_id: targetWaiterId,
+        note,
+    });
+    return response.data;
+};
+
 // =====================
 // Bookings
 // =====================
@@ -82,6 +90,8 @@ export const createOrder = async (tableId, items) => {
             items: items.map((item) => ({
                 dish: item.dish || item.dish_id,
                 quantity: Number(item.quantity),
+                seat_number: item.seat_number,
+                guest_label: item.guest_label,
             })),
         },
         {
@@ -89,6 +99,8 @@ export const createOrder = async (tableId, items) => {
             items: items.map((item) => ({
                 dish_id: item.dish || item.dish_id,
                 quantity: Number(item.quantity),
+                seat_number: item.seat_number,
+                guest_label: item.guest_label,
             })),
         },
         {
@@ -96,6 +108,8 @@ export const createOrder = async (tableId, items) => {
             items: items.map((item) => ({
                 dish: item.dish || item.dish_id,
                 quantity: Number(item.quantity),
+                seat_number: item.seat_number,
+                guest_label: item.guest_label,
             })),
         },
         {
@@ -103,6 +117,8 @@ export const createOrder = async (tableId, items) => {
             items: items.map((item) => ({
                 dish_id: item.dish || item.dish_id,
                 quantity: Number(item.quantity),
+                seat_number: item.seat_number,
+                guest_label: item.guest_label,
             })),
         },
     ];
@@ -208,6 +224,15 @@ export const toggleDishAvailability = async (dishId, payload = {}) => {
 
 export const getMenuSettings = async (params = {}) => {
     const response = await apiClient.get('/api/menu/settings/', { params });
+    return response.data;
+};
+
+export const submitInventorySpotCheck = async ({ ingredient_id, counted_quantity, note }) => {
+    const response = await apiClient.post('/api/v1/mobile/inventory/spot-check/', {
+        ingredient_id,
+        counted_quantity,
+        note,
+    });
     return response.data;
 };
 

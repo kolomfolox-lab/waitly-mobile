@@ -68,6 +68,7 @@ export default function OrderCreationScreen({ route, navigation }) {
     const [dishes, setDishes] = useState([]);
     const [activeCategory, setActiveCategory] = useState('all');
     const [cart, setCart] = useState({});
+    const [activeSeat, setActiveSeat] = useState(1);
     const [submitting, setSubmitting] = useState(false);
     const [loading, setLoading] = useState(true);
     const [menuError, setMenuError] = useState('');
@@ -113,37 +114,52 @@ export default function OrderCreationScreen({ route, navigation }) {
         return dishes.filter(d => d.category === activeCategory);
     };
 
+    const cartKey = (dishId, seatNumber = activeSeat) => `${dishId}::seat-${seatNumber}`;
+
     const addToCart = (dishId) => {
+        const key = cartKey(dishId);
         setCart(prev => ({
             ...prev,
-            [dishId]: (prev[dishId] || 0) + 1,
+            [key]: {
+                dishId,
+                quantity: (prev[key]?.quantity || 0) + 1,
+                seat_number: activeSeat,
+                guest_label: `Guest ${activeSeat}`,
+            },
         }));
     };
 
     const removeFromCart = (dishId) => {
+        const key = cartKey(dishId);
         setCart(prev => {
-            const current = prev[dishId] || 0;
+            const current = prev[key]?.quantity || 0;
             if (current <= 1) {
                 const newCart = { ...prev };
-                delete newCart[dishId];
+                delete newCart[key];
                 return newCart;
             }
-            return { ...prev, [dishId]: current - 1 };
+            return {
+                ...prev,
+                [key]: {
+                    ...prev[key],
+                    quantity: current - 1,
+                },
+            };
         });
     };
 
     const getCartTotal = () => {
-        return Object.entries(cart).reduce((sum, [dishId, qty]) => {
-            const dish = dishes.find(d => d.id === dishId);
+        return Object.values(cart).reduce((sum, item) => {
+            const dish = dishes.find(d => d.id === item.dishId);
             if (dish) {
-                return sum + (parseFloat(dish.price) || 0) * qty;
+                return sum + (parseFloat(dish.price) || 0) * item.quantity;
             }
             return sum;
         }, 0);
     };
 
     const getCartItemCount = () => {
-        return Object.values(cart).reduce((sum, qty) => sum + qty, 0);
+        return Object.values(cart).reduce((sum, item) => sum + item.quantity, 0);
     };
 
     const formatCurrency = (val) => {
@@ -164,9 +180,11 @@ export default function OrderCreationScreen({ route, navigation }) {
 
         setSubmitting(true);
         try {
-            const items = Object.entries(cart).map(([dishId, quantity]) => ({
-                dish: dishId,
-                quantity: quantity,
+            const items = Object.values(cart).map((item) => ({
+                dish: item.dishId,
+                quantity: item.quantity,
+                seat_number: item.seat_number,
+                guest_label: item.guest_label,
             }));
 
             const orderResponse = await createOrder(tableId, items);
@@ -174,12 +192,13 @@ export default function OrderCreationScreen({ route, navigation }) {
             navigation.replace('OrderConfirmation', {
                 tableNumber,
                 total: getCartTotal(),
-                items: Object.entries(cart).map(([dishId, qty]) => {
-                    const dish = dishes.find(d => d.id === dishId);
+                items: Object.values(cart).map((item) => {
+                    const dish = dishes.find(d => d.id === item.dishId);
                     return {
                         name: dish?.name || 'Блюдо',
-                        quantity: qty,
+                        quantity: item.quantity,
                         price: parseFloat(dish?.price || 0),
+                        guest_label: item.guest_label,
                     };
                 }),
                 orderId: orderResponse?.id,
@@ -213,6 +232,31 @@ export default function OrderCreationScreen({ route, navigation }) {
 
             {/* Category Pills */}
             <Animated.View style={[styles.catWrapper, { opacity: fadeAnim }]}>
+                <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.seatContainer}
+                >
+                    {[1, 2, 3, 4].map((seat) => {
+                        const isActive = activeSeat === seat;
+                        return (
+                            <TouchableOpacity
+                                key={seat}
+                                style={[styles.seatPill, isActive && styles.seatPillActive]}
+                                onPress={() => setActiveSeat(seat)}
+                            >
+                                <MaterialIcons
+                                    name="event-seat"
+                                    size={16}
+                                    color={isActive ? COLORS.white : COLORS.primary}
+                                />
+                                <Text style={[styles.seatText, isActive && styles.seatTextActive]}>
+                                    Guest {seat}
+                                </Text>
+                            </TouchableOpacity>
+                        );
+                    })}
+                </ScrollView>
                 <ScrollView
                     horizontal
                     showsHorizontalScrollIndicator={false}
@@ -269,7 +313,7 @@ export default function OrderCreationScreen({ route, navigation }) {
                     showsVerticalScrollIndicator={false}
                 >
                     {getFilteredDishes().map((dish, index) => {
-                        const qty = cart[dish.id] || 0;
+                        const qty = cart[cartKey(dish.id)]?.quantity || 0;
                         const isUnavailable = dish.is_available === false;
 
                         return (
@@ -396,6 +440,36 @@ const styles = StyleSheet.create({
     },
     catWrapper: {
         marginBottom: 4,
+    },
+    seatContainer: {
+        paddingHorizontal: 16,
+        paddingTop: 8,
+        paddingBottom: 4,
+        gap: 8,
+        flexDirection: 'row',
+    },
+    seatPill: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        paddingHorizontal: 14,
+        paddingVertical: 9,
+        borderRadius: 999,
+        backgroundColor: COLORS.white,
+        borderWidth: 1,
+        borderColor: COLORS.primaryLight,
+    },
+    seatPillActive: {
+        backgroundColor: COLORS.primary,
+        borderColor: COLORS.primary,
+    },
+    seatText: {
+        fontSize: 13,
+        fontWeight: '700',
+        color: COLORS.primary,
+    },
+    seatTextActive: {
+        color: COLORS.white,
     },
     catContainer: {
         paddingHorizontal: 16,
