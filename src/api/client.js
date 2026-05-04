@@ -1,10 +1,8 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Alert } from 'react-native';
 
-// API URL for your local network - use this IP on your physical device
-// For Android Emulator, use: http://10.0.2.2:8000/api
-// For iOS Simulator, use: http://localhost:8000/api
-export const API_URL = 'https://gusto.moonlauncher.org/api';
+export const API_URL = 'https://api.moonlauncher.org/api/v1';
 
 const client = axios.create({
     baseURL: API_URL,
@@ -12,6 +10,10 @@ const client = axios.create({
         'Content-Type': 'application/json',
     },
 });
+
+const clearAuthStorage = async () => {
+    await AsyncStorage.multiRemove(['access_token', 'refresh_token', 'user_role', 'user_data']);
+};
 
 client.interceptors.request.use(async (config) => {
     const token = await AsyncStorage.getItem('access_token');
@@ -24,13 +26,44 @@ client.interceptors.request.use(async (config) => {
 client.interceptors.response.use(
     (response) => response,
     async (error) => {
-        // Handle 401 calls (logout or refresh token logic here)
-        if (error.response && error.response.status === 401) {
-            // Ideally trigger token refresh or logout
-            await AsyncStorage.removeItem('access_token');
-            await AsyncStorage.removeItem('user_role');
-            await AsyncStorage.removeItem('user_data');
+        const originalRequest = error.config;
+
+        if (error.response?.status === 401 && !originalRequest?._retry) {
+            originalRequest._retry = true;
+
+            try {
+                const refreshToken = await AsyncStorage.getItem('refresh_token');
+                if (!refreshToken) {
+                    throw error;
+                }
+
+                const refreshResponse = await axios.post(`${API_URL}/auth/refresh/`, {
+                    refresh: refreshToken,
+                });
+
+                const { access, refresh } = refreshResponse.data;
+                await AsyncStorage.setItem('access_token', access);
+                if (refresh) {
+                    await AsyncStorage.setItem('refresh_token', refresh);
+                }
+
+                originalRequest.headers = originalRequest.headers || {};
+                originalRequest.headers.Authorization = `Bearer ${access}`;
+                return client(originalRequest);
+            } catch (refreshError) {
+                await clearAuthStorage();
+                return Promise.reject(refreshError);
+            }
         }
+
+        if (error.response?.status === 403) {
+            await clearAuthStorage();
+            Alert.alert(
+                'Access changed',
+                error.response?.data?.error?.message || 'Your role or access changed. Please sign in again.'
+            );
+        }
+
         return Promise.reject(error);
     }
 );
