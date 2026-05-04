@@ -6,6 +6,7 @@ import {
     StyleSheet,
     Text,
     TouchableOpacity,
+    useWindowDimensions,
     View,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -14,6 +15,7 @@ import { useKitchen } from '../../context/KitchenContext';
 import KitchenOrderCard from '../../components/kitchen/KitchenOrderCard';
 import KitchenScaffold from '../../components/kitchen/KitchenScaffold';
 import { filterKitchenOrders } from '../../utils/kitchen';
+import { getDeviceLayout, getGridItemWidth } from '../../utils/responsive';
 
 const COLORS = {
     panel: '#ffffff',
@@ -27,6 +29,12 @@ const COLORS = {
 
 export default function KitchenDashboard({ navigation }) {
     const { user } = useAuth();
+    const { width } = useWindowDimensions();
+    const deviceLayout = useMemo(() => getDeviceLayout(width), [width]);
+    const cardWidth = useMemo(
+        () => getGridItemWidth(width, deviceLayout.columns, deviceLayout.gutter, 40),
+        [width, deviceLayout.columns, deviceLayout.gutter]
+    );
     const {
         activeOrders,
         connectionLabel,
@@ -147,8 +155,11 @@ export default function KitchenDashboard({ navigation }) {
             )}
         >
             <FlatList
+                key={deviceLayout.columns}
                 data={filteredOrders}
                 keyExtractor={(item) => item.id}
+                numColumns={deviceLayout.columns}
+                columnWrapperStyle={deviceLayout.columns > 1 ? { gap: deviceLayout.gutter } : undefined}
                 refreshControl={(
                     <RefreshControl
                         refreshing={refreshing}
@@ -229,13 +240,15 @@ export default function KitchenDashboard({ navigation }) {
                     </View>
                 )}
                 renderItem={({ item }) => (
-                    <KitchenOrderCard
-                        order={item}
-                        currentTime={currentTime}
-                        onPress={() => navigation.navigate('KitchenOrderDetails', { orderId: item.id })}
-                        quickActions={buildQuickActions(item)}
-                        disabled={loading}
-                    />
+                    <View style={[styles.orderGridItem, { width: cardWidth }]}>
+                        <KitchenOrderCard
+                            order={item}
+                            currentTime={currentTime}
+                            onPress={() => navigation.navigate('KitchenOrderDetails', { orderId: item.id })}
+                            quickActions={buildQuickActions(item)}
+                            disabled={loading}
+                        />
+                    </View>
                 )}
                 ListEmptyComponent={(
                     <View style={styles.emptyState}>
@@ -255,6 +268,9 @@ const styles = StyleSheet.create({
     listContent: {
         paddingHorizontal: 20,
         paddingBottom: 40,
+    },
+    orderGridItem: {
+        marginBottom: 16,
     },
     heroCard: {
         backgroundColor: COLORS.panel,
