@@ -4,7 +4,7 @@ import client from './client';
  * Fetch all dishes
  */
 export const fetchDishes = async () => {
-    const response = await client.get('/menu/dishes/');
+    const response = await client.get('/core/dishes/');
     return response.data;
 };
 
@@ -12,7 +12,7 @@ export const fetchDishes = async () => {
  * Fetch dishes grouped by category
  */
 export const fetchDishesByCategory = async () => {
-    const response = await client.get('/menu/dishes/by_category/');
+    const response = await client.get('/core/dishes/by_category/');
     return response.data;
 };
 
@@ -20,7 +20,7 @@ export const fetchDishesByCategory = async () => {
  * Fetch all menu categories
  */
 export const fetchCategories = async () => {
-    const response = await client.get('/menu/categories/');
+    const response = await client.get('/core/categories/');
     return response.data;
 };
 
@@ -46,7 +46,7 @@ export const createDish = async (dishData) => {
         formData.append('description', dishData.description);
     }
 
-    const response = await client.post('/menu/dishes/', formData, {
+    const response = await client.post('/core/dishes/', formData, {
         headers: {
             'Content-Type': 'multipart/form-data',
         },
@@ -58,7 +58,7 @@ export const createDish = async (dishData) => {
  * Toggle dish availability (mark as in stock / out of stock)
  */
 export const toggleDishAvailability = async (dishId, isAvailable, reason = '') => {
-    const response = await client.post(`/menu/dishes/${dishId}/toggle_availability/`, {
+    const response = await client.post(`/core/dishes/${dishId}/toggle_availability/`, {
         is_available: isAvailable,
         unavailable_reason: reason
     });
@@ -69,7 +69,7 @@ export const toggleDishAvailability = async (dishId, isAvailable, reason = '') =
  * Update a dish
  */
 export const updateDish = async (dishId, dishData) => {
-    const response = await client.patch(`/menu/dishes/${dishId}/`, dishData);
+    const response = await client.patch(`/core/dishes/${dishId}/`, dishData);
     return response.data;
 };
 
@@ -77,7 +77,7 @@ export const updateDish = async (dishId, dishData) => {
  * Delete a dish
  */
 export const deleteDish = async (dishId) => {
-    const response = await client.delete(`/menu/dishes/${dishId}/`);
+    const response = await client.delete(`/core/dishes/${dishId}/`);
     return response.data;
 };
 
@@ -85,6 +85,6 @@ export const deleteDish = async (dishId) => {
  * Create a new category
  */
 export const createCategory = async (name) => {
-    const response = await client.post('/menu/categories/', { name });
+    const response = await client.post('/core/categories/', { name });
     return response.data;
 };
