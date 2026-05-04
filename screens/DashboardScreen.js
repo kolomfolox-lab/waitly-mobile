@@ -26,8 +26,8 @@ export default function DashboardScreen({ navigation }) {
 
     const loadTables = async () => {
         try {
-            const response = await api.get('/api/tables/tables/');
-            setTables(response.data);
+            const response = await api.get('/api/v1/mobile/tables/live/');
+            setTables(response.data.tables || []);
         } catch (error) {
             console.error('Error loading tables:', error);
             Alert.alert('Error', 'Failed to load tables');

@@ -19,7 +19,7 @@ export default function LoginScreen({ navigation }) {
 
         setLoading(true);
         try {
-            const response = await api.post('/api/auth/login/', {
+            const response = await api.post('/api/v1/auth/login/', {
                 phone_number: phone,
                 password: password,
             });
@@ -35,7 +35,7 @@ export default function LoginScreen({ navigation }) {
             navigation.replace('Dashboard');
         } catch (error) {
             console.error('[Login Error]', error.response?.data);
-            Alert.alert('Login Failed', error.response?.data?.error || 'Invalid credentials');
+            Alert.alert('Login Failed', error.response?.data?.error?.message || error.response?.data?.message || 'Invalid credentials');
         } finally {
             setLoading(false);
         }
