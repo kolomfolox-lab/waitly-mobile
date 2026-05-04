@@ -41,6 +41,7 @@ import MenuManagementScreen from '../screens/kitchen/MenuManagementScreen';
 import OwnerDashboard from '../screens/owner/OwnerDashboard';
 import StaffScreen from '../screens/owner/StaffScreen';
 import OwnerMenuScreen from '../screens/owner/OwnerMenuScreen';
+import InventoryScreen from '../screens/InventoryScreen';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -289,6 +290,7 @@ function OwnerTabs() {
                 StatsTab: 'bar-chart',
                 StaffTab: 'people',
                 OwnerMenuTab: 'restaurant-menu',
+                InventoryTab: 'inventory',
                 ProfileTab: 'person',
             })}
         >
@@ -296,6 +298,7 @@ function OwnerTabs() {
             <Tab.Screen name="StaffTab" component={StaffScreen} options={{ tabBarLabel: 'Персонал' }} />
             <Tab.Screen name="OwnerMenuTab" component={OwnerMenuScreen} options={{ tabBarLabel: 'Меню' }} />
             <Tab.Screen name="ProfileTab" component={ProfileStack} options={{ tabBarLabel: 'Профиль' }} />
+            <Tab.Screen name="InventoryTab" component={InventoryScreen} options={{ tabBarLabel: 'Inventory' }} />
         </Tab.Navigator>
     );
 }
@@ -309,6 +312,7 @@ function getRoleComponent(role) {
         case 'RESTAURANT_OWNER':
         case 'CHAIN_OWNER':
         case 'SUPER_ADMIN':
+        case 'MANAGER':
             return OwnerTabs;
         case 'WAITER':
         case 'HEAD_WAITER':
