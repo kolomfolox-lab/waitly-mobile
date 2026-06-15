@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import Storage from '../../../src/utils/storage';
 import { useTranslation } from 'react-i18next';
 
 const COLORS = {
@@ -24,7 +24,7 @@ export default function LanguageScreen({ navigation }) {
 
     const handleChangeLanguage = async (language) => {
         await i18n.changeLanguage(language);
-        await AsyncStorage.setItem('app_language', language);
+        await Storage.setItem('app_language', language);
     };
 
     const activeLanguage = (i18n.resolvedLanguage || i18n.language || 'ru').split('-')[0].toLowerCase();

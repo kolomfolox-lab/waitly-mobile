@@ -1,0 +1,11 @@
+[build]
+  command = "npx expo export -p web --output-dir dist"
+  publish = "dist"
+
+[build.environment]
+  EXPO_USE_WEBPACK = "0"
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

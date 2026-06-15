@@ -1,5 +1,5 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import Storage from '../utils/storage';
 import { Alert } from 'react-native';
 import { getOrders, getTables } from '../api/apiService';
 import { useAuth } from './AuthContext';
@@ -105,8 +105,8 @@ export function NotificationsProvider({ children }) {
         const loadStoredState = async () => {
             try {
                 const [storedItems, storedSettings] = await Promise.all([
-                    AsyncStorage.getItem(STORAGE_KEYS.items),
-                    AsyncStorage.getItem(STORAGE_KEYS.settings),
+                    Storage.getItem(STORAGE_KEYS.items),
+                    Storage.getItem(STORAGE_KEYS.settings),
                 ]);
 
                 if (isMounted && storedItems) {
@@ -136,13 +136,13 @@ export function NotificationsProvider({ children }) {
     }, []);
 
     useEffect(() => {
-        AsyncStorage.setItem(STORAGE_KEYS.items, JSON.stringify(notifications)).catch((error) => {
+        Storage.setItem(STORAGE_KEYS.items, JSON.stringify(notifications)).catch((error) => {
             console.log('Failed to persist notifications:', error.message);
         });
     }, [notifications]);
 
     useEffect(() => {
-        AsyncStorage.setItem(STORAGE_KEYS.settings, JSON.stringify(settings)).catch((error) => {
+        Storage.setItem(STORAGE_KEYS.settings, JSON.stringify(settings)).catch((error) => {
             console.log('Failed to persist notification settings:', error.message);
         });
     }, [settings]);

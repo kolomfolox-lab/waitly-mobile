@@ -1,6 +1,7 @@
 import React, { createContext, useState, useEffect, useContext } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import Storage from '../utils/storage';
 import { authLogin, getMe } from '../api/apiService';
+import { telegramLogin, telegramLinkPhone } from '../api/telegramAuth';
 
 const AuthContext = createContext();
 
@@ -41,7 +42,6 @@ export const AuthProvider = ({ children }) => {
         subscriptionExpiresAt: null,
         subscriptionStatus: null,
     });
-
     useEffect(() => {
         loadStorageData();
     }, []);
@@ -51,33 +51,20 @@ export const AuthProvider = ({ children }) => {
         setUser(userData);
         setRole(userData.role);
         setSubscriptionLock(subscriptionState);
-        await AsyncStorage.setItem('user_data', JSON.stringify(userData));
-        await AsyncStorage.setItem('user_role', userData.role);
+        await Storage.setItem('user_data', JSON.stringify(userData));
+        await Storage.setItem('user_role', userData.role);
     };
 
     const loadStorageData = async () => {
         try {
-            const token = await AsyncStorage.getItem('auth_access_token');
-            if (token) {
-                try {
-                    const userData = await getMe();
-                    await applyUserData(userData);
-                } catch (apiError) {
-                    console.log('Token verification failed, trying cached data:', apiError.message);
-                    const cachedRole = await AsyncStorage.getItem('user_role');
-                    const cachedUser = await AsyncStorage.getItem('user_data');
-                    if (cachedRole && cachedUser) {
-                        const parsedUser = JSON.parse(cachedUser);
-                        setUser(parsedUser);
-                        setRole(cachedRole);
-                        setSubscriptionLock(getRestaurantSubscription(parsedUser));
-                    } else {
-                        await clearStorage();
-                    }
-                }
-            }
+            await Storage.multiRemove([
+                'auth_access_token',
+                'auth_refresh_token',
+                'user_role',
+                'user_data',
+            ]);
         } catch (e) {
-            console.log('Failed to load auth data:', e);
+            console.log('Failed to clear auth data:', e);
         } finally {
             setLoading(false);
         }
@@ -88,10 +75,10 @@ export const AuthProvider = ({ children }) => {
             const response = await authLogin(phoneNumber, password);
 
             if (response.access) {
-                await AsyncStorage.setItem('auth_access_token', response.access);
+                await Storage.setItem('auth_access_token', response.access);
             }
             if (response.refresh) {
-                await AsyncStorage.setItem('auth_refresh_token', response.refresh);
+                await Storage.setItem('auth_refresh_token', response.refresh);
             }
 
             const userData = await getMe();
@@ -99,6 +86,50 @@ export const AuthProvider = ({ children }) => {
             return true;
         } catch (error) {
             console.error('Login failed:', error.response?.data || error.message);
+            throw error;
+        }
+    };
+
+    const telegramAuth = async (initData) => {
+        try {
+            const response = await telegramLogin(initData);
+
+            if (response.needs_phone_link) {
+                return { needsPhoneLink: true, initData };
+            }
+
+            if (response.access) {
+                await Storage.setItem('auth_access_token', response.access);
+            }
+            if (response.refresh) {
+                await Storage.setItem('auth_refresh_token', response.refresh);
+            }
+
+            const userData = await getMe();
+            await applyUserData(userData);
+            return true;
+        } catch (error) {
+            console.error('Telegram login failed:', error.response?.data || error.message);
+            throw error;
+        }
+    };
+
+    const telegramLink = async (initData, phoneNumber) => {
+        try {
+            const response = await telegramLinkPhone(initData, phoneNumber);
+
+            if (response.access) {
+                await Storage.setItem('auth_access_token', response.access);
+            }
+            if (response.refresh) {
+                await Storage.setItem('auth_refresh_token', response.refresh);
+            }
+
+            const userData = await getMe();
+            await applyUserData(userData);
+            return true;
+        } catch (error) {
+            console.error('Telegram link failed:', error.response?.data || error.message);
             throw error;
         }
     };
@@ -122,7 +153,7 @@ export const AuthProvider = ({ children }) => {
     };
 
     const clearStorage = async () => {
-        await AsyncStorage.multiRemove([
+        await Storage.multiRemove([
             'auth_access_token',
             'auth_refresh_token',
             'user_role',
@@ -131,7 +162,7 @@ export const AuthProvider = ({ children }) => {
     };
 
     return (
-        <AuthContext.Provider value={{ user, role, loading, login, logout, refreshUser, subscriptionLock }}>
+        <AuthContext.Provider value={{ user, role, loading, login, logout, telegramAuth, telegramLink, refreshUser, subscriptionLock }}>
             {children}
         </AuthContext.Provider>
     );

@@ -22,13 +22,20 @@
       "edgeToEdgeEnabled": true
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro",
+      "output": "single",
+      "build": {
+        "babel": {
+          "include": ["@twa-dev/sdk"]
+        }
+      }
     },
     "plugins": [
       "expo-localization"
     ],
     "experiments": {
-      "baseUrl": "/Waitly-React"
+      "baseUrl": "/"
     }
   }
 }

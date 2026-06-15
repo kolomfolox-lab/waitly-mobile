@@ -1,4 +1,4 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import Storage from '../utils/storage';
 
 export const AVATAR_STORAGE_KEY = 'waitly_profile_avatar_preset';
 
@@ -17,7 +17,7 @@ export const getAvatarPresetById = (avatarId) => (
 
 export const loadStoredAvatarPreset = async () => {
     try {
-        return await AsyncStorage.getItem(AVATAR_STORAGE_KEY);
+        return await Storage.getItem(AVATAR_STORAGE_KEY);
     } catch (error) {
         return null;
     }
@@ -25,11 +25,11 @@ export const loadStoredAvatarPreset = async () => {
 
 export const saveStoredAvatarPreset = async (avatarId) => {
     if (!avatarId) {
-        await AsyncStorage.removeItem(AVATAR_STORAGE_KEY);
+        await Storage.removeItem(AVATAR_STORAGE_KEY);
         return null;
     }
 
-    await AsyncStorage.setItem(AVATAR_STORAGE_KEY, avatarId);
+    await Storage.setItem(AVATAR_STORAGE_KEY, avatarId);
     return avatarId;
 };
 

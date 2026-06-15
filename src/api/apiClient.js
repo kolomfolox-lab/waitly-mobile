@@ -1,5 +1,5 @@
 import axios from 'axios';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import Storage from '../utils/storage';
 
 const API_BASE_URL = 'https://api.moonlauncher.org';
 
@@ -15,7 +15,7 @@ const apiClient = axios.create({
 apiClient.interceptors.request.use(
     async (config) => {
         try {
-            const token = await AsyncStorage.getItem('auth_access_token');
+            const token = await Storage.getItem('auth_access_token');
             if (token) {
                 config.headers.Authorization = `Bearer ${token}`;
             }
@@ -33,7 +33,7 @@ apiClient.interceptors.response.use(
     async (error) => {
         if (error.response?.status === 401) {
             // Token expired — clear storage, app will redirect to login
-            await AsyncStorage.multiRemove([
+            await Storage.multiRemove([
                 'auth_access_token',
                 'auth_refresh_token',
                 'user_role',

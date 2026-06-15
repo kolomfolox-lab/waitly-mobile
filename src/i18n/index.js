@@ -1,6 +1,6 @@
 import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
-import * as Localization from 'expo-localization';
+import { Platform } from 'react-native';
 
 // Import translation files
 import ru from './locales/ru.json';
@@ -16,6 +16,11 @@ const resources = {
 // Get device language safely
 const getDeviceLanguage = () => {
     try {
+        if (Platform.OS === 'web') {
+            const lang = navigator.language || navigator.languages?.[0] || 'ru-RU';
+            return String(lang).split('-')[0].toLowerCase();
+        }
+        const Localization = require('expo-localization');
         const locale = Localization.getLocales?.()?.[0]?.languageTag
             || Localization.locale
             || Localization.locales?.[0]?.languageTag
@@ -32,8 +37,8 @@ i18n
     .init({
         compatibilityJSON: 'v3',
         resources,
-        lng: getDeviceLanguage(), // Get device language safely
-        fallbackLng: 'ru', // Default to Russian
+        lng: getDeviceLanguage(),
+        fallbackLng: 'ru',
         supportedLngs: ['ru', 'uz', 'en'],
         nonExplicitSupportedLngs: true,
         cleanCode: true,

@@ -11,6 +11,7 @@ import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/AuthContext';
 import { KitchenProvider } from '../context/KitchenContext';
 import LoginScreen from '../screens/common/LoginScreen';
+import LinkPhoneScreen from '../screens/common/LinkPhoneScreen';
 import SubscriptionExpiredScreen from '../screens/common/SubscriptionExpiredScreen';
 import UnauthorizedRoleScreen from '../screens/common/UnauthorizedRoleScreen';
 
@@ -341,7 +342,10 @@ export default function AppNavigator() {
         <NavigationContainer>
             <Stack.Navigator screenOptions={{ headerShown: false }}>
                 {!user ? (
-                    <Stack.Screen name="Login" component={LoginScreen} />
+                    <>
+                        <Stack.Screen name="Login" component={LoginScreen} />
+                        <Stack.Screen name="LinkPhone" component={LinkPhoneScreen} />
+                    </>
                 ) : subscriptionLock.blocked && !allowKitchenReadOnly ? (
                     <Stack.Screen name="SubscriptionExpired" component={SubscriptionExpiredScreen} />
                 ) : MainComponent ? (

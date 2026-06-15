@@ -1,5 +1,5 @@
 import axios from 'axios';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import Storage from '../utils/storage';
 import { Alert } from 'react-native';
 
 export const API_URL = 'https://api.moonlauncher.org/api/v1';
@@ -12,11 +12,11 @@ const client = axios.create({
 });
 
 const clearAuthStorage = async () => {
-    await AsyncStorage.multiRemove(['access_token', 'refresh_token', 'user_role', 'user_data']);
+        await Storage.multiRemove(['access_token', 'refresh_token', 'user_role', 'user_data']);
 };
 
 client.interceptors.request.use(async (config) => {
-    const token = await AsyncStorage.getItem('access_token');
+    const token = await Storage.getItem('access_token');
     if (token) {
         config.headers.Authorization = `Bearer ${token}`;
     }
@@ -32,7 +32,7 @@ client.interceptors.response.use(
             originalRequest._retry = true;
 
             try {
-                const refreshToken = await AsyncStorage.getItem('refresh_token');
+                const refreshToken = await Storage.getItem('refresh_token');
                 if (!refreshToken) {
                     throw error;
                 }
@@ -42,9 +42,9 @@ client.interceptors.response.use(
                 });
 
                 const { access, refresh } = refreshResponse.data;
-                await AsyncStorage.setItem('access_token', access);
+                await Storage.setItem('access_token', access);
                 if (refresh) {
-                    await AsyncStorage.setItem('refresh_token', refresh);
+                    await Storage.setItem('refresh_token', refresh);
                 }
 
                 originalRequest.headers = originalRequest.headers || {};

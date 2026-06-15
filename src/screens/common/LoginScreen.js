@@ -1,15 +1,12 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
     View,
     Text,
     StyleSheet,
     TouchableOpacity,
-    TextInput,
     SafeAreaView,
     Animated,
     Easing,
-    KeyboardAvoidingView,
-    Platform,
     ActivityIndicator,
     Alert,
     Dimensions,
@@ -17,8 +14,9 @@ import {
 import { MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../../context/AuthContext';
+import { useTelegram } from '../../telegram/TelegramProvider';
 
-const { width, height } = Dimensions.get('window');
+const { width } = Dimensions.get('window');
 
 const COLORS = {
     primary: '#ff6b6b',
@@ -27,179 +25,180 @@ const COLORS = {
     white: '#FFFFFF',
     textDark: '#0f172a',
     textMuted: '#94a3b8',
-    slate100: '#f1f5f9',
-    slate200: '#e2e8f0',
-    danger: '#EE5A6F',
+    telegram: '#0088cc',
 };
 
-export default function LoginScreen() {
-    const { login } = useAuth();
-    const [phone, setPhone] = useState('+998');
-    const [password, setPassword] = useState('');
-    const [loading, setLoading] = useState(false);
-    const [showPassword, setShowPassword] = useState(false);
+const POLL_INTERVAL = 2000;
+const POLL_TIMEOUT = 20000;
 
-    // Animations
+export default function LoginScreen() {
+    const { telegramAuth } = useAuth();
+    const { initData, isTelegramEnv, WebApp } = useTelegram();
+    const [state, setState] = useState('idle');
+    const [pollCount, setPollCount] = useState(0);
+
     const logoScale = useRef(new Animated.Value(0.5)).current;
     const logoOpacity = useRef(new Animated.Value(0)).current;
-    const formTranslateY = useRef(new Animated.Value(60)).current;
-    const formOpacity = useRef(new Animated.Value(0)).current;
+    const contentOpacity = useRef(new Animated.Value(0)).current;
 
     useEffect(() => {
-        Animated.sequence([
-            Animated.parallel([
-                Animated.spring(logoScale, {
-                    toValue: 1,
-                    friction: 6,
-                    tension: 40,
-                    useNativeDriver: true,
-                }),
-                Animated.timing(logoOpacity, {
-                    toValue: 1,
-                    duration: 600,
-                    useNativeDriver: true,
-                }),
-            ]),
-            Animated.parallel([
-                Animated.timing(formTranslateY, {
-                    toValue: 0,
-                    duration: 500,
-                    easing: Easing.out(Easing.cubic),
-                    useNativeDriver: true,
-                }),
-                Animated.timing(formOpacity, {
-                    toValue: 1,
-                    duration: 500,
-                    useNativeDriver: true,
-                }),
-            ]),
+        Animated.parallel([
+            Animated.spring(logoScale, {
+                toValue: 1, friction: 6, tension: 40, useNativeDriver: true,
+            }),
+            Animated.timing(logoOpacity, {
+                toValue: 1, duration: 600, useNativeDriver: true,
+            }),
         ]).start();
+        Animated.timing(contentOpacity, {
+            toValue: 1, duration: 500, delay: 300, easing: Easing.out(Easing.cubic), useNativeDriver: true,
+        }).start();
     }, []);
 
-    const handleLogin = async () => {
-        if (phone.length < 4) {
-            Alert.alert('Ошибка', 'Введите номер телефона');
-            return;
-        }
-        if (password.length < 1) {
-            Alert.alert('Ошибка', 'Введите пароль');
-            return;
-        }
+    const pollLogin = useCallback(async () => {
+        setState('polling');
+        setPollCount(0);
+        const start = Date.now();
 
-        setLoading(true);
+        const tryLogin = async () => {
+            const elapsed = Date.now() - start;
+            if (elapsed >= POLL_TIMEOUT) {
+                setState('timeout');
+                return;
+            }
+            setPollCount(p => p + 1);
+            try {
+                const result = await telegramAuth(initData);
+                if (result === true) {
+                    setState('done');
+                    return;
+                }
+            } catch (e) {
+                // ignore, retry
+            }
+            setTimeout(tryLogin, POLL_INTERVAL);
+        };
+
+        setTimeout(tryLogin, 1000);
+    }, [initData, telegramAuth]);
+
+    const handleShareContact = async () => {
+        if (!WebApp || !isTelegramEnv) return;
+        setState('requesting');
         try {
-            await login(phone, password);
-        } catch (error) {
-            const msg = error.response?.data?.detail
-                || error.response?.data?.message
-                || error.response?.data?.non_field_errors?.[0]
-                || 'Неверный номер телефона или пароль';
-            Alert.alert('Ошибка входа', msg);
-        } finally {
-            setLoading(false);
+            const shared = await WebApp.requestContact();
+            if (shared === true) {
+                await pollLogin();
+            } else {
+                setState('idle');
+            }
+        } catch (e) {
+            setState('idle');
         }
     };
 
     return (
         <SafeAreaView style={styles.container}>
-            <KeyboardAvoidingView
-                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-                style={styles.keyboardView}
-            >
-                <View style={styles.content}>
-                    {/* Logo Area */}
-                    <Animated.View style={[styles.logoArea, { opacity: logoOpacity, transform: [{ scale: logoScale }] }]}>
-                        <LinearGradient
-                            colors={[COLORS.primary, '#ff8a8a']}
-                            start={{ x: 0, y: 0 }}
-                            end={{ x: 1, y: 1 }}
-                            style={styles.logoCircle}
-                        >
-                            <MaterialIcons name="restaurant" size={48} color={COLORS.white} />
-                        </LinearGradient>
-                        <Text style={styles.appName}>Waitly</Text>
-                        <Text style={styles.appSubtitle}>Управление рестораном</Text>
-                    </Animated.View>
+            <View style={styles.content}>
+                <Animated.View style={[styles.logoArea, { opacity: logoOpacity, transform: [{ scale: logoScale }] }]}>
+                    <LinearGradient
+                        colors={[COLORS.primary, '#ff8a8a']}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                        style={styles.logoCircle}
+                    >
+                        <MaterialIcons name="restaurant" size={48} color={COLORS.white} />
+                    </LinearGradient>
+                    <Text style={styles.appName}>Waitly</Text>
+                    <Text style={styles.appSubtitle}>Управление рестораном</Text>
+                </Animated.View>
 
-                    {/* Login Form */}
-                    <Animated.View style={[styles.formArea, { opacity: formOpacity, transform: [{ translateY: formTranslateY }] }]}>
-                        <Text style={styles.formTitle}>Вход в систему</Text>
-
-                        {/* Phone Input */}
-                        <View style={styles.inputWrapper}>
-                            <View style={styles.inputIconBox}>
-                                <MaterialIcons name="phone" size={20} color={COLORS.primary} />
-                            </View>
-                            <TextInput
-                                style={styles.input}
-                                placeholder="Номер телефона"
-                                placeholderTextColor={COLORS.textMuted}
-                                value={phone}
-                                onChangeText={setPhone}
-                                keyboardType="phone-pad"
-                                autoCapitalize="none"
-                            />
-                        </View>
-
-                        {/* Password Input */}
-                        <View style={styles.inputWrapper}>
-                            <View style={styles.inputIconBox}>
-                                <MaterialIcons name="lock" size={20} color={COLORS.primary} />
-                            </View>
-                            <TextInput
-                                style={styles.input}
-                                placeholder="Пароль"
-                                placeholderTextColor={COLORS.textMuted}
-                                value={password}
-                                onChangeText={setPassword}
-                                secureTextEntry={!showPassword}
-                            />
-                            <TouchableOpacity
-                                style={styles.eyeBtn}
-                                onPress={() => setShowPassword(!showPassword)}
-                            >
-                                <MaterialIcons
-                                    name={showPassword ? 'visibility' : 'visibility-off'}
-                                    size={20}
-                                    color={COLORS.textMuted}
-                                />
-                            </TouchableOpacity>
-                        </View>
-
-                        {/* Login Button */}
-                        <TouchableOpacity
-                            style={[styles.loginBtn, loading && styles.loginBtnDisabled]}
-                            onPress={handleLogin}
-                            disabled={loading}
-                            activeOpacity={0.8}
-                        >
-                            <LinearGradient
-                                colors={[COLORS.primary, '#ff8a8a']}
-                                start={{ x: 0, y: 0 }}
-                                end={{ x: 1, y: 0 }}
-                                style={styles.loginBtnGradient}
-                            >
-                                {loading ? (
-                                    <ActivityIndicator color={COLORS.white} size="small" />
-                                ) : (
-                                    <>
-                                        <Text style={styles.loginBtnText}>Войти</Text>
-                                        <MaterialIcons name="arrow-forward" size={20} color={COLORS.white} />
-                                    </>
-                                )}
-                            </LinearGradient>
-                        </TouchableOpacity>
-
-                        {/* Demo Hint */}
-                        <View style={styles.hintBox}>
-                            <MaterialIcons name="info-outline" size={16} color={COLORS.textMuted} />
-                            <Text style={styles.hintText}>
-                                Тестовый режим — введите любой номер и пароль
+                <Animated.View style={[styles.actionArea, { opacity: contentOpacity }]}>
+                    {state === 'polling' || state === 'requesting' ? (
+                        <View style={styles.loadingBox}>
+                            <ActivityIndicator size="large" color={COLORS.primary} />
+                            <Text style={styles.loadingText}>
+                                {state === 'requesting'
+                                    ? 'Запрос номера...'
+                                    : `Проверка... (${pollCount}s)`}
+                            </Text>
+                            <Text style={styles.loadingHint}>
+                                {state === 'polling' && 'Нажмите «Поделиться» в диалоге Telegram'}
                             </Text>
                         </View>
-                    </Animated.View>
-                </View>
-            </KeyboardAvoidingView>
+                    ) : null}
+
+                    {state === 'timeout' ? (
+                        <View style={styles.errorBox}>
+                            <MaterialIcons name="error-outline" size={48} color={COLORS.primary} />
+                            <Text style={styles.errorTitle}>Не удалось получить номер</Text>
+                            <Text style={styles.errorText}>
+                                Попробуйте ещё раз или вернитесь в чат с ботом и нажмите кнопку «Поделиться номером»
+                            </Text>
+                            <TouchableOpacity
+                                style={styles.retryBtn}
+                                onPress={handleShareContact}
+                                activeOpacity={0.8}
+                            >
+                                <LinearGradient
+                                    colors={[COLORS.primary, '#ff8a8a']}
+                                    start={{ x: 0, y: 0 }}
+                                    end={{ x: 1, y: 0 }}
+                                    style={styles.retryBtnGradient}
+                                >
+                                    <MaterialIcons name="refresh" size={20} color={COLORS.white} />
+                                    <Text style={styles.retryBtnText}>Попробовать снова</Text>
+                                </LinearGradient>
+                            </TouchableOpacity>
+                        </View>
+                    ) : null}
+
+                    {state === 'idle' && isTelegramEnv ? (
+                        <View style={styles.telegramBox}>
+                            <LinearGradient
+                                colors={['rgba(0,136,204,0.08)', 'rgba(0,136,204,0.02)']}
+                                start={{ x: 0, y: 0 }}
+                                end={{ x: 1, y: 1 }}
+                                style={styles.telegramPromo}
+                            >
+                                <MaterialIcons name="smartphone" size={40} color={COLORS.telegram} />
+                                <Text style={styles.telegramPromoTitle}>Вход через Telegram</Text>
+                                <Text style={styles.telegramPromoText}>
+                                    Нажмите кнопку ниже, чтобы поделиться номером телефона через Telegram
+                                </Text>
+                            </LinearGradient>
+                            <TouchableOpacity
+                                style={styles.shareBtn}
+                                onPress={handleShareContact}
+                                activeOpacity={0.8}
+                            >
+                                <LinearGradient
+                                    colors={[COLORS.telegram, '#0099dd']}
+                                    start={{ x: 0, y: 0 }}
+                                    end={{ x: 1, y: 0 }}
+                                    style={styles.shareBtnGradient}
+                                >
+                                    <MaterialIcons name="telegram" size={22} color={COLORS.white} />
+                                    <Text style={styles.shareBtnText}>Поделиться номером</Text>
+                                </LinearGradient>
+                            </TouchableOpacity>
+                            <View style={styles.hintBox}>
+                                <MaterialIcons name="info-outline" size={14} color={COLORS.textMuted} />
+                                <Text style={styles.hintText}>
+                                    Нужно всего один раз — для входа в приложение
+                                </Text>
+                            </View>
+                        </View>
+                    ) : state === 'idle' && !isTelegramEnv ? (
+                        <View style={styles.webFallback}>
+                            <MaterialIcons name="open-in-browser" size={40} color={COLORS.textMuted} />
+                            <Text style={styles.webFallbackText}>
+                                Откройте эту страницу в Telegram
+                            </Text>
+                        </View>
+                    ) : null}
+                </Animated.View>
+            </View>
         </SafeAreaView>
     );
 }
@@ -208,9 +207,6 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: COLORS.backgroundLight,
-    },
-    keyboardView: {
-        flex: 1,
     },
     content: {
         flex: 1,
@@ -246,71 +242,104 @@ const styles = StyleSheet.create({
         marginTop: 4,
         fontWeight: '500',
     },
-    formArea: {
+    actionArea: {
         gap: 16,
     },
-    formTitle: {
-        fontSize: 22,
-        fontWeight: '700',
+    loadingBox: {
+        alignItems: 'center',
+        paddingVertical: 40,
+        gap: 16,
+    },
+    loadingText: {
+        fontSize: 17,
+        fontWeight: '600',
         color: COLORS.textDark,
-        marginBottom: 8,
+    },
+    loadingHint: {
+        fontSize: 13,
+        color: COLORS.textMuted,
         textAlign: 'center',
     },
-    inputWrapper: {
-        flexDirection: 'row',
+    errorBox: {
         alignItems: 'center',
-        backgroundColor: COLORS.white,
-        borderRadius: 16,
-        paddingHorizontal: 4,
-        height: 56,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.04,
-        shadowRadius: 8,
-        elevation: 2,
-        borderWidth: 1,
-        borderColor: 'rgba(0,0,0,0.04)',
+        paddingVertical: 24,
+        gap: 12,
     },
-    inputIconBox: {
-        width: 44,
-        height: 44,
-        borderRadius: 12,
-        backgroundColor: 'rgba(255, 107, 107, 0.08)',
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginRight: 4,
-    },
-    input: {
-        flex: 1,
-        height: '100%',
-        fontSize: 16,
+    errorTitle: {
+        fontSize: 18,
+        fontWeight: '700',
         color: COLORS.textDark,
-        fontWeight: '500',
     },
-    eyeBtn: {
-        padding: 12,
+    errorText: {
+        fontSize: 14,
+        color: COLORS.textMuted,
+        textAlign: 'center',
+        lineHeight: 20,
+        paddingHorizontal: 16,
     },
-    loginBtn: {
-        marginTop: 8,
+    retryBtn: {
+        marginTop: 12,
         borderRadius: 16,
         overflow: 'hidden',
+        width: '100%',
         shadowColor: COLORS.primary,
         shadowOffset: { width: 0, height: 6 },
         shadowOpacity: 0.35,
         shadowRadius: 12,
         elevation: 8,
     },
-    loginBtnDisabled: {
-        opacity: 0.7,
-    },
-    loginBtnGradient: {
+    retryBtnGradient: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
         paddingVertical: 18,
         gap: 8,
     },
-    loginBtnText: {
+    retryBtnText: {
+        color: COLORS.white,
+        fontSize: 17,
+        fontWeight: '700',
+    },
+    telegramBox: {
+        gap: 16,
+    },
+    telegramPromo: {
+        alignItems: 'center',
+        paddingVertical: 28,
+        paddingHorizontal: 20,
+        borderRadius: 20,
+        gap: 12,
+        borderWidth: 1,
+        borderColor: 'rgba(0,136,204,0.12)',
+    },
+    telegramPromoTitle: {
+        fontSize: 18,
+        fontWeight: '700',
+        color: COLORS.textDark,
+    },
+    telegramPromoText: {
+        fontSize: 14,
+        color: COLORS.textMuted,
+        textAlign: 'center',
+        lineHeight: 20,
+    },
+    shareBtn: {
+        borderRadius: 16,
+        overflow: 'hidden',
+        shadowColor: COLORS.telegram,
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.35,
+        shadowRadius: 12,
+        elevation: 8,
+    },
+    shareBtnGradient: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 18,
+        gap: 10,
+    },
+    shareBtnText: {
         color: COLORS.white,
         fontSize: 17,
         fontWeight: '700',
@@ -320,11 +349,21 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         gap: 6,
-        marginTop: 8,
     },
     hintText: {
         fontSize: 13,
         color: COLORS.textMuted,
         fontWeight: '500',
+    },
+    webFallback: {
+        alignItems: 'center',
+        paddingVertical: 40,
+        gap: 12,
+    },
+    webFallbackText: {
+        fontSize: 16,
+        color: COLORS.textMuted,
+        fontWeight: '600',
+        textAlign: 'center',
     },
 });
