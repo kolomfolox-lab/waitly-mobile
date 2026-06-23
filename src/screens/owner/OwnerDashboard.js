@@ -82,20 +82,8 @@ export default function OwnerDashboard({ navigation }) {
     const totalRevenue = todayOrders.reduce((sum, o) => sum + (parseFloat(o.total_amount) || 0), 0);
     const avgCheck = todayOrders.length > 0 ? (totalRevenue / todayOrders.length) : 0;
 
-    // Fake top dishes (derive from random/static until orders API supports item aggregation)
-    const topDishes = dishes.slice(0, 3).map((d, i) => ({
-        ...d,
-        ordersCount: 45 - (i * 12),
-        revenue: (45 - (i * 12)) * parseFloat(d.price)
-    }));
-
-    // Fake top waiters (using staff list)
-    const topWaiters = staff.filter(s => s.role === 'WAITER' || s.role === 'HEAD_WAITER').slice(0, 3).map((w, i) => ({
-        ...w,
-        rating: (4.9 - (i * 0.1)).toFixed(1),
-        ordersCount: 23 - (i * 4),
-        revenue: (23 - (i * 4)) * 44827 // avg fake check
-    }));
+    const topDishes: any[] = [];
+    const topWaiters: any[] = [];
 
     const restaurantName = user?.restaurant_name || 'Ресторан Sezam';
     const networkName = user?.network_name || 'Сеть Sezam';
@@ -143,7 +131,7 @@ export default function OwnerDashboard({ navigation }) {
                                     <Text style={[styles.badgeText, { color: COLORS.success }]}>+12%</Text>
                                 </View>
                             </View>
-                            <Text style={styles.metricValue}>{todayOrders.length > 0 ? todayOrders.length : 145}</Text>
+                            <Text style={styles.metricValue}>{todayOrders.length > 0 ? todayOrders.length : 0}</Text>
                         </View>
 
                         {/* Revenue */}
@@ -155,7 +143,7 @@ export default function OwnerDashboard({ navigation }) {
                                 </View>
                             </View>
                             <View style={styles.valueRow}>
-                                <Text style={styles.metricValue}>{totalRevenue > 0 ? formatCurrency(totalRevenue).split(' ')[0] : '6,500,000'}</Text>
+                                <Text style={styles.metricValue}>{totalRevenue > 0 ? formatCurrency(totalRevenue).split(' ')[0] : '0'}</Text>
                                 <Text style={styles.metricCurrency}>СУМ</Text>
                             </View>
                         </View>
@@ -169,7 +157,7 @@ export default function OwnerDashboard({ navigation }) {
                                 </View>
                             </View>
                             <View style={styles.valueRow}>
-                                <Text style={styles.metricValue}>{avgCheck > 0 ? formatCurrency(avgCheck).split(' ')[0] : '44,827'}</Text>
+                                <Text style={styles.metricValue}>{avgCheck > 0 ? formatCurrency(avgCheck).split(' ')[0] : '0'}</Text>
                                 <Text style={styles.metricCurrency}>СУМ</Text>
                             </View>
                         </View>

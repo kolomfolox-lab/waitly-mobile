@@ -114,12 +114,13 @@ export default function StaffScreen() {
     };
 
     const submitNewStaff = async (fullName, phone, role) => {
+        const tempPassword = Math.random().toString(36).slice(-10) + 'A1!';
         try {
             await createStaff({
                 full_name: fullName,
                 phone_number: phone,
                 role: role,
-                password: 'waitly123',
+                password: tempPassword,
             });
             Alert.alert('Готово', `${fullName} добавлен как ${getRoleLabel(role)}`);
             fetchStaff();
@@ -219,19 +220,14 @@ export default function StaffScreen() {
                     <Text style={styles.sectionHeader}>НА СМЕНЕ</Text>
 
                     {filteredStaff.map((member, index) => {
-                        // Mocking data based on image copy 7
-                        const isOnline = index % 3 !== 2; // Fake online status 
-                        const ordersCount = isOnline ? 12 : 0;
-                        const rating = isOnline ? 4.7 : 4.9;
-
                         return (
                             <View key={member.id} style={styles.staffCard}>
                                 <View style={styles.avatarContainer}>
                                     <Image
-                                        source={{ uri: `https://i.pravatar.cc/150?u=${member.id}` }}
-                                        style={[styles.avatarImg, !isOnline && { opacity: 0.3, grayscale: 1 }]}
+                                        source={member.avatar ? { uri: member.avatar } : require('../../assets/avatar-placeholder.png')}
+                                        style={styles.avatarImg}
                                     />
-                                    <View style={[styles.statusDot, { backgroundColor: isOnline ? COLORS.success : COLORS.textMuted }]} />
+                                    <View style={[styles.statusDot, { backgroundColor: member.is_active ? COLORS.success : COLORS.textMuted }]} />
                                 </View>
 
                                 <View style={styles.staffInfo}>
@@ -242,18 +238,7 @@ export default function StaffScreen() {
                                         </View>
                                     </View>
 
-                                    <Text style={styles.staffPhone}>{member.phone_number || '+7 (900) 000-00-00'}</Text>
-
-                                    <View style={styles.staffBottomRow}>
-                                        <View style={styles.statChip}>
-                                            <MaterialIcons name="receipt-long" size={14} color={COLORS.primary} />
-                                            <Text style={styles.statChipText}>{ordersCount} заказов</Text>
-                                        </View>
-                                        <View style={styles.statChip}>
-                                            <MaterialIcons name="star" size={14} color={COLORS.warning} />
-                                            <Text style={styles.statChipText}>{rating}</Text>
-                                        </View>
-                                    </View>
+                                    <Text style={styles.staffPhone}>{member.phone_number}</Text>
                                 </View>
 
                                 <View style={styles.staffActions}>

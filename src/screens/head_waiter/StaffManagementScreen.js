@@ -42,36 +42,7 @@ export default function StaffManagementScreen({ navigation }) {
     const [refreshing, setRefreshing] = useState(false);
     const [activeFilter, setActiveFilter] = useState('Все');
 
-    // Abstracting mock data replicating the design
-    const [staff, setStaff] = useState([
-        {
-            id: 1,
-            name: 'Азиз Алиев',
-            role: 'Официант',
-            phone: '+7 (900) 123-45-67',
-            status: 'online',
-            avatar: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDdkQ8ITDksik7t7k0aVmWUmZ_H3HrD8mPAU3N-3k5n7n7f4swv3cz6bP-6fvlrpBSu5uxdy95oPLiAZ6PKHjXhNfqR3fCIRrPGVS9nuc9M6JOsIcNBZK4tzjxm5gLJJLysy2uCxz5U4kwoJM-Tb9i_8YHkwyAQzrPbHP0tIO5hpipSPk98tvvdr5jU-Gu9IJocEq17l40Hvg0pafR3OuTeOwX1jtBx5bEJK7bQJT1d32e5mzEtRuz62hbLCXtfkBDi0PiYCQ7mETV3',
-            stats: { orders: 12, rating: 4.7 }
-        },
-        {
-            id: 2,
-            name: 'Елена Смирнова',
-            role: 'Повар',
-            phone: '+7 (900) 987-65-43',
-            status: 'online',
-            avatar: 'https://lh3.googleusercontent.com/aida-public/AB6AXuAN6fAo77imrqajIDttKL4h5XtPf1orn-QhxayVTRwlvcaGam5AofGbOBK6iQm62TNySdLa1MTGNLoiZQ-2_tPpv3uycQ6C8GiqVvhuRkvEj3FRct2R9mRXZHD_17kuWmpT_yJNbsOrAx35GoGXAsqAeu6tsMId3QIeCcLttI30waoXfMaBkUcxgsuPck-QWBXeBn3uiMP3LHmnJVFwRq6dfVE1cErWRW1TuVb_yVcI4VFNMIjyxF2Hi9hF2xhJCBIDbYBYJr5jQzeL',
-            stats: null
-        },
-        {
-            id: 3,
-            name: 'Иван Петров',
-            role: 'Официант',
-            phone: '+7 (901) 555-01-02',
-            status: 'offline',
-            avatar: null,
-            stats: { orders: 0, rating: 4.9 }
-        },
-    ]);
+    const [staff, setStaff] = useState<any[]>([]);
 
     // Animations
     const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -130,9 +101,16 @@ export default function StaffManagementScreen({ navigation }) {
         ]).start();
     }, []);
 
-    const onRefresh = React.useCallback(() => {
+    const onRefresh = React.useCallback(async () => {
         setRefreshing(true);
-        setTimeout(() => setRefreshing(false), 1200);
+        try {
+            const res = await fetch('/api/owner/staff/');
+            const data = await res.json();
+            setStaff(data);
+        } catch {
+            setStaff([]);
+        }
+        setRefreshing(false);
     }, []);
 
     const getFilteredStaff = () => {
