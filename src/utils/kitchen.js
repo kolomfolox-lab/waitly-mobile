@@ -1,9 +1,11 @@
-export const KITCHEN_ROLES = new Set(['CHEF', 'COOK', 'HEAD_CHEF']);
+export const KITCHEN_ROLES = new Set(['CHEF', 'COOK', 'HEAD_CHEF', 'KITCHEN_MANAGER', 'BARTENDER']);
 
 export const KITCHEN_ROLE_LABELS = {
     CHEF: 'Chef',
     COOK: 'Cook',
     HEAD_CHEF: 'Head Chef',
+    KITCHEN_MANAGER: 'Kitchen Manager',
+    BARTENDER: 'Bartender',
 };
 
 export const KITCHEN_HOME_FILTERS = [
@@ -294,4 +296,43 @@ export const getApiErrorMessage = (error, fallback = 'Something went wrong.') =>
     error?.response?.data?.message ||
     error?.response?.data?.non_field_errors?.[0] ||
     fallback
+);
+
+const BAR_KEYWORDS = [
+    'bar', 'drink', 'beverage', 'cocktail', 'mocktail',
+    'beer', 'wine', 'whiskey', 'whisky', 'vodka', 'rum',
+    'gin', 'tequila', 'liquor', 'liqueur', 'spirit',
+    'juice', 'soda', 'cola', 'lemonade', 'smoothie',
+    'coffee', 'tea', 'espresso', 'cappuccino', 'latte',
+    'water', 'mineral', 'sparkling', 'tonic', 'syrup',
+];
+
+export const isBarItem = (item, dishes = []) => {
+    const categoryName = item?.category_name || item?.category?.name || item?.category || '';
+    const catLower = String(categoryName).toLowerCase();
+    if (BAR_KEYWORDS.some((kw) => catLower.includes(kw))) {
+        return true;
+    }
+
+    const dishName = item?.dish_name || item?.name || '';
+    const nameLower = dishName.toLowerCase();
+    if (BAR_KEYWORDS.some((kw) => nameLower.includes(kw))) {
+        return true;
+    }
+
+    if (item?.dish && dishes.length > 0) {
+        const dishId = item.dish;
+        const dish = dishes.find((d) => String(d.id) === String(dishId) || String(d.uuid) === String(dishId));
+        if (dish) {
+            const dishCat = dish?.category_name || dish?.category?.name || dish?.category || '';
+            const dishCatLower = String(dishCat).toLowerCase();
+            return BAR_KEYWORDS.some((kw) => dishCatLower.includes(kw));
+        }
+    }
+
+    return false;
+};
+
+export const filterBarOrders = (orders, dishes = []) => (
+    orders.filter((order) => (order?.items || []).some((item) => isBarItem(item, dishes)))
 );
