@@ -38,6 +38,10 @@ import KitchenAvailabilityScreen from '../screens/kitchen/KitchenAvailabilityScr
 import KitchenUpdatesScreen from '../screens/kitchen/KitchenUpdatesScreen';
 import MenuManagementScreen from '../screens/kitchen/MenuManagementScreen';
 
+// Bartender
+import BarDashboard from '../screens/bartender/BarDashboard';
+import BarOrderDetailsScreen from '../screens/bartender/BarOrderDetailsScreen';
+
 // Owner
 import OwnerDashboard from '../screens/owner/OwnerDashboard';
 import StaffScreen from '../screens/owner/StaffScreen';
@@ -90,6 +94,7 @@ const HIDDEN_TAB_ROUTES = new Set([
     'KitchenAvailability',
     'KitchenUpdates',
     'KitchenMenuManagement',
+    'BarOrderDetails',
 ]);
 
 function GlassTabBackground() {
@@ -284,6 +289,39 @@ function KitchenTabs() {
     );
 }
 
+function BarQueueStack() {
+    return (
+        <Stack.Navigator screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="BarHome" component={BarDashboard} />
+            <Stack.Screen name="BarOrderDetails" component={BarOrderDetailsScreen} />
+        </Stack.Navigator>
+    );
+}
+
+function BartenderTabsInner() {
+    const { t } = useTranslation();
+
+    return (
+        <Tab.Navigator
+            screenOptions={buildTabScreenOptions({
+                QueueTab: 'local-bar',
+                ProfileTab: 'person',
+            })}
+        >
+            <Tab.Screen name="QueueTab" component={BarQueueStack} options={{ tabBarLabel: t('tab_queue') }} />
+            <Tab.Screen name="ProfileTab" component={ProfileStack} options={{ tabBarLabel: t('tab_profile') }} />
+        </Tab.Navigator>
+    );
+}
+
+function BartenderTabs() {
+    return (
+        <KitchenProvider>
+            <BartenderTabsInner />
+        </KitchenProvider>
+    );
+}
+
 function OwnerTabs() {
     return (
         <Tab.Navigator
@@ -309,7 +347,10 @@ function getRoleComponent(role) {
         case 'CHEF':
         case 'COOK':
         case 'HEAD_CHEF':
+        case 'KITCHEN_MANAGER':
             return KitchenTabs;
+        case 'BARTENDER':
+            return BartenderTabs;
         case 'RESTAURANT_OWNER':
         case 'CHAIN_OWNER':
         case 'SUPER_ADMIN':
@@ -336,7 +377,7 @@ export default function AppNavigator() {
     }
 
     const MainComponent = user ? getRoleComponent(user.role) : null;
-    const allowKitchenReadOnly = Boolean(user && ['CHEF', 'COOK', 'HEAD_CHEF'].includes(user.role));
+    const allowKitchenReadOnly = Boolean(user && ['CHEF', 'COOK', 'HEAD_CHEF', 'KITCHEN_MANAGER'].includes(user.role));
 
     return (
         <NavigationContainer>
