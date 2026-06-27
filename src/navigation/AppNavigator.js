@@ -42,6 +42,10 @@ import MenuManagementScreen from '../screens/kitchen/MenuManagementScreen';
 import BarDashboard from '../screens/bartender/BarDashboard';
 import BarOrderDetailsScreen from '../screens/bartender/BarOrderDetailsScreen';
 
+// Courier
+import CourierDashboard from '../screens/courier/CourierDashboard';
+import CourierOrderDetailsScreen from '../screens/courier/CourierOrderDetailsScreen';
+
 // Owner
 import OwnerDashboard from '../screens/owner/OwnerDashboard';
 import StaffScreen from '../screens/owner/StaffScreen';
@@ -95,6 +99,7 @@ const HIDDEN_TAB_ROUTES = new Set([
     'KitchenUpdates',
     'KitchenMenuManagement',
     'BarOrderDetails',
+    'CourierOrderDetails',
 ]);
 
 function GlassTabBackground() {
@@ -322,6 +327,30 @@ function BartenderTabs() {
     );
 }
 
+function CourierDeliveryStack() {
+    return (
+        <Stack.Navigator screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="CourierHome" component={CourierDashboard} />
+            <Stack.Screen name="CourierOrderDetails" component={CourierOrderDetailsScreen} />
+        </Stack.Navigator>
+    );
+}
+
+function CourierTabs() {
+    const { t } = useTranslation();
+    return (
+        <Tab.Navigator
+            screenOptions={buildTabScreenOptions({
+                DeliveriesTab: 'motorcycle',
+                ProfileTab: 'person',
+            })}
+        >
+            <Tab.Screen name="DeliveriesTab" component={CourierDeliveryStack} options={{ tabBarLabel: 'Deliveries' }} />
+            <Tab.Screen name="ProfileTab" component={ProfileStack} options={{ tabBarLabel: t('tab_profile') }} />
+        </Tab.Navigator>
+    );
+}
+
 function OwnerTabs() {
     return (
         <Tab.Navigator
@@ -349,6 +378,8 @@ function getRoleComponent(role) {
         case 'HEAD_CHEF':
         case 'KITCHEN_MANAGER':
             return KitchenTabs;
+        case 'COURIER':
+            return CourierTabs;
         case 'BARTENDER':
             return BartenderTabs;
         case 'RESTAURANT_OWNER':
