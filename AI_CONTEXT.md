@@ -143,17 +143,21 @@ waitly_backend/
 | `WAITER` | WaiterHome, TableScreen, OrderScreen, CartScreen, BillScreen | /tables, /orders |
 | `CHEF` | KitchenBoard, CookingScreen | /kitchen |
 | `COOK` | KitchenBoard, CookingScreen | (через CHEF) |
-| `HEAD_WAITER` | ManagerDashboard, ShiftScreen | /shifts, /staff |
+| `HEAD_WAITER` | HeadWaiterDashboard, StaffManagementScreen, ShiftScreen | /shifts, /staff |
 | `MANAGER` | ManagerDashboard, ShiftScreen, InventoryScreen | /dashboard, /staff, /inventory |
 | `RESTAURANT_OWNER` | OwnerDashboard, AnalyticsScreen, InventoryScreen, StaffScreen | /dashboard, /analytics, /staff, /menu, /pricing |
 | `CHAIN_OWNER` | OwnerDashboard, NetworksScreen | всё выше + /networks |
 | `SUPER_ADMIN` | ProfileScreen | всё, системные настройки |
-| `SHIFT_LEADER` | — (use mobile) | /shift-leader |
-| `DISPATCHER` | — (use mobile) | /dispatcher |
+| `SHIFT_LEADER` | ShiftLeaderDashboard | /shift-leader |
+| `DISPATCHER` | DispatcherDashboard | /dispatcher |
 | `COURIER` | CourierDashboard, CourierOrderDetails | /courier |
-| `SUPPORT` | — (use mobile) | /support |
-| `AUDITOR` | — (use mobile) | /auditor |
-| `SUPPLIER` | — (use mobile) | /supplier |
+| `ACCOUNTANT` | AccountantDashboard | /accountant |
+| `MARKETER` | MarketerDashboard | /marketer |
+| `ANALYST` | AnalystDashboard | /analyst |
+| `SUPPORT` | SupportDashboard | /support |
+| `AUDITOR` | AuditorDashboard | /auditor |
+| `SUPPLIER` | SupplierDashboard | /supplier |
+| `HEAD_CHEF` | KitchenTabs (shared with CHEF) | — |
 
 ## Ключевые API-эндпоинты (бэкенд)
 
@@ -271,4 +275,4 @@ docker-compose -f docker-compose.prod.yml up -d
 
 4. **Feature Flags**: все фичи включаются через подписку. Бесплатный тариф = базовые функции (QR-меню, заказы, отзывы). Бизнес = 299k UZS/мес, Enterprise = 799k UZS/мес.
 
-5. **3 orphaned экрана**: ChefDashboard, HeadWaiterDashboard, StaffManagementScreen — существуют в коде, но не подключены к навигации.
+5. **Все экраны подключены**: ChefDashboard — CHEF роль имеет KitchenTabs (использует KitchenDashboard), ChefDashboard доступен как запасной. HeadWaiterDashboard + StaffManagementScreen — HEAD_WAITER использует их вместо WaiterTabs.
