@@ -30,6 +30,7 @@ import { useNotifications } from '../context/NotificationsContext';
 
 // Kitchen
 import KitchenDashboard from '../screens/kitchen/KitchenDashboard';
+import ChefDashboard from '../screens/chef/ChefDashboard';
 import AssignedOrdersScreen from '../screens/kitchen/AssignedOrdersScreen';
 import AvailableOrdersScreen from '../screens/kitchen/AvailableOrdersScreen';
 import KitchenOrderDetailsScreen from '../screens/kitchen/KitchenOrderDetailsScreen';
@@ -37,6 +38,10 @@ import KitchenDelayScreen from '../screens/kitchen/KitchenDelayScreen';
 import KitchenAvailabilityScreen from '../screens/kitchen/KitchenAvailabilityScreen';
 import KitchenUpdatesScreen from '../screens/kitchen/KitchenUpdatesScreen';
 import MenuManagementScreen from '../screens/kitchen/MenuManagementScreen';
+
+// Head Waiter
+import HeadWaiterDashboard from '../screens/head_waiter/HeadWaiterDashboard';
+import StaffManagementScreen from '../screens/head_waiter/StaffManagementScreen';
 
 // Bartender
 import BarDashboard from '../screens/bartender/BarDashboard';
@@ -51,6 +56,30 @@ import OwnerDashboard from '../screens/owner/OwnerDashboard';
 import StaffScreen from '../screens/owner/StaffScreen';
 import OwnerMenuScreen from '../screens/owner/OwnerMenuScreen';
 import InventoryScreen from '../screens/InventoryScreen';
+
+// Shift Leader
+import ShiftLeaderDashboard from '../screens/shiftleader/ShiftLeaderDashboard';
+
+// Dispatcher
+import DispatcherDashboard from '../screens/dispatcher/DispatcherDashboard';
+
+// Accountant
+import AccountantDashboard from '../screens/accountant/AccountantDashboard';
+
+// Marketer
+import MarketerDashboard from '../screens/marketer/MarketerDashboard';
+
+// Analyst
+import AnalystDashboard from '../screens/analyst/AnalystDashboard';
+
+// Support
+import SupportDashboard from '../screens/support/SupportDashboard';
+
+// Auditor
+import AuditorDashboard from '../screens/auditor/AuditorDashboard';
+
+// Supplier
+import SupplierDashboard from '../screens/supplier/SupplierDashboard';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -260,9 +289,56 @@ function WaiterTabs() {
     );
 }
 
+function HeadWaiterDashboardStack() {
+    return (
+        <Stack.Navigator screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="HeadWaiterHome" component={HeadWaiterDashboard} />
+            <Stack.Screen name="OrderCreation" component={OrderCreationScreen} />
+            <Stack.Screen name="OrderConfirmation" component={OrderConfirmationScreen} options={{ gestureEnabled: false }} />
+        </Stack.Navigator>
+    );
+}
+
+function HeadWaiterStaffStack() {
+    return (
+        <Stack.Navigator screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="StaffManageHome" component={StaffManagementScreen} />
+        </Stack.Navigator>
+    );
+}
+
+function HeadWaiterTabs() {
+    const { unreadCount } = useNotifications();
+    const { t } = useTranslation();
+
+    return (
+        <Tab.Navigator
+            screenOptions={buildTabScreenOptions({
+                HomeTab: 'assignment-turned-in',
+                StaffTab: 'people',
+                OrdersTab: 'receipt-long',
+                ProfileTab: 'person',
+            })}
+        >
+            <Tab.Screen name="HomeTab" component={HeadWaiterDashboardStack} options={{ tabBarLabel: 'Смена' }} />
+            <Tab.Screen name="StaffTab" component={HeadWaiterStaffStack} options={{ tabBarLabel: 'Персонал' }} />
+            <Tab.Screen name="OrdersTab" component={WaiterOrdersStack} options={{ tabBarLabel: t('tab_orders') }} />
+            <Tab.Screen
+                name="ProfileTab"
+                component={ProfileStack}
+                options={{
+                    tabBarLabel: t('tab_profile'),
+                    tabBarBadge: unreadCount > 0 ? unreadCount : undefined,
+                    tabBarBadgeStyle: { backgroundColor: COLORS.primary, color: COLORS.white },
+                }}
+            />
+        </Tab.Navigator>
+    );
+}
+
 function KitchenTabsInner() {
     const { user } = useAuth();
-    const isChef = user?.role === 'CHEF';
+    const isChefOrHeadChef = user?.role === 'CHEF' || user?.role === 'HEAD_CHEF';
     const { t } = useTranslation();
 
     return (
@@ -278,7 +354,7 @@ function KitchenTabsInner() {
             <Tab.Screen name="QueueTab" component={KitchenQueueStack} options={{ tabBarLabel: t('tab_queue') }} />
             <Tab.Screen name="AssignedTab" component={AssignedOrdersStack} options={{ tabBarLabel: t('tab_assigned') }} />
             <Tab.Screen name="AvailableTab" component={AvailableOrdersStack} options={{ tabBarLabel: t('tab_available') }} />
-            {isChef ? (
+            {isChefOrHeadChef ? (
                 <Tab.Screen name="MenuTab" component={ChefMenuStack} options={{ tabBarLabel: t('tab_menu') }} />
             ) : null}
             <Tab.Screen name="ProfileTab" component={ProfileStack} options={{ tabBarLabel: t('tab_profile') }} />
@@ -345,7 +421,7 @@ function CourierTabs() {
                 ProfileTab: 'person',
             })}
         >
-            <Tab.Screen name="DeliveriesTab" component={CourierDeliveryStack} options={{ tabBarLabel: 'Deliveries' }} />
+            <Tab.Screen name="DeliveriesTab" component={CourierDeliveryStack} options={{ tabBarLabel: 'Доставки' }} />
             <Tab.Screen name="ProfileTab" component={ProfileStack} options={{ tabBarLabel: t('tab_profile') }} />
         </Tab.Navigator>
     );
@@ -366,9 +442,56 @@ function OwnerTabs() {
             <Tab.Screen name="StaffTab" component={StaffScreen} options={{ tabBarLabel: 'Персонал' }} />
             <Tab.Screen name="OwnerMenuTab" component={OwnerMenuScreen} options={{ tabBarLabel: 'Меню' }} />
             <Tab.Screen name="ProfileTab" component={ProfileStack} options={{ tabBarLabel: 'Профиль' }} />
-            <Tab.Screen name="InventoryTab" component={InventoryScreen} options={{ tabBarLabel: 'Inventory' }} />
+            <Tab.Screen name="InventoryTab" component={InventoryScreen} options={{ tabBarLabel: 'Склад' }} />
         </Tab.Navigator>
     );
+}
+
+function SingleTabNavigator({ DashboardComponent, icon, label }) {
+    const { t } = useTranslation();
+    return (
+        <Tab.Navigator
+            screenOptions={buildTabScreenOptions({
+                MainTab: icon,
+                ProfileTab: 'person',
+            })}
+        >
+            <Tab.Screen name="MainTab" component={DashboardComponent} options={{ tabBarLabel: label }} />
+            <Tab.Screen name="ProfileTab" component={ProfileStack} options={{ tabBarLabel: t('tab_profile') }} />
+        </Tab.Navigator>
+    );
+}
+
+function ShiftLeaderTabs() {
+    return <SingleTabNavigator DashboardComponent={ShiftLeaderDashboard} icon="assignment" label="Смены" />;
+}
+
+function DispatcherTabs() {
+    return <SingleTabNavigator DashboardComponent={DispatcherDashboard} icon="local-shipping" label="Доставки" />;
+}
+
+function AccountantTabs() {
+    return <SingleTabNavigator DashboardComponent={AccountantDashboard} icon="account-balance" label="Финансы" />;
+}
+
+function MarketerTabs() {
+    return <SingleTabNavigator DashboardComponent={MarketerDashboard} icon="campaign" label="Маркетинг" />;
+}
+
+function AnalystTabs() {
+    return <SingleTabNavigator DashboardComponent={AnalystDashboard} icon="analytics" label="Аналитика" />;
+}
+
+function SupportTabs() {
+    return <SingleTabNavigator DashboardComponent={SupportDashboard} icon="support-agent" label="Поддержка" />;
+}
+
+function AuditorTabs() {
+    return <SingleTabNavigator DashboardComponent={AuditorDashboard} icon="fact-check" label="Аудит" />;
+}
+
+function SupplierTabs() {
+    return <SingleTabNavigator DashboardComponent={SupplierDashboard} icon="inventory-2" label="Поставки" />;
 }
 
 function getRoleComponent(role) {
@@ -378,6 +501,8 @@ function getRoleComponent(role) {
         case 'HEAD_CHEF':
         case 'KITCHEN_MANAGER':
             return KitchenTabs;
+        case 'HEAD_WAITER':
+            return HeadWaiterTabs;
         case 'COURIER':
             return CourierTabs;
         case 'BARTENDER':
@@ -388,9 +513,24 @@ function getRoleComponent(role) {
         case 'MANAGER':
             return OwnerTabs;
         case 'WAITER':
-        case 'HEAD_WAITER':
         case 'HOSTESS':
             return WaiterTabs;
+        case 'SHIFT_LEADER':
+            return ShiftLeaderTabs;
+        case 'DISPATCHER':
+            return DispatcherTabs;
+        case 'ACCOUNTANT':
+            return AccountantTabs;
+        case 'MARKETER':
+            return MarketerTabs;
+        case 'ANALYST':
+            return AnalystTabs;
+        case 'SUPPORT':
+            return SupportTabs;
+        case 'AUDITOR':
+            return AuditorTabs;
+        case 'SUPPLIER':
+            return SupplierTabs;
         default:
             return null;
     }
