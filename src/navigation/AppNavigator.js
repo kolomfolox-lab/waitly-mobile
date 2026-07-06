@@ -81,6 +81,17 @@ import AuditorDashboard from '../screens/auditor/AuditorDashboard';
 // Supplier
 import SupplierDashboard from '../screens/supplier/SupplierDashboard';
 
+// Guest
+import GuestScannerScreen from '../screens/guest/GuestScannerScreen';
+import GuestMenuScreen from '../screens/guest/GuestMenuScreen';
+import GuestCartScreen from '../screens/guest/GuestCartScreen';
+import GuestOrderTrackingScreen from '../screens/guest/GuestOrderTrackingScreen';
+import GuestPaymentScreen from '../screens/guest/GuestPaymentScreen';
+import GuestProfileScreen from '../screens/guest/GuestProfileScreen';
+
+// Guest Cart
+import { CartProvider } from '../context/CartContext';
+
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
 
@@ -494,6 +505,61 @@ function SupplierTabs() {
     return <SingleTabNavigator DashboardComponent={SupplierDashboard} icon="inventory-2" label="Поставки" />;
 }
 
+function GuestMenuStack() {
+    return (
+        <Stack.Navigator screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="GuestMenuHome" component={GuestMenuScreen} />
+        </Stack.Navigator>
+    );
+}
+
+function GuestCartStack() {
+    return (
+        <Stack.Navigator screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="GuestCartHome" component={GuestCartScreen} />
+            <Stack.Screen name="GuestPayment" component={GuestPaymentScreen} />
+            <Stack.Screen name="GuestOrderTracking" component={GuestOrderTrackingScreen} />
+        </Stack.Navigator>
+    );
+}
+
+function GuestOrderStack() {
+    return (
+        <Stack.Navigator screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="GuestOrderHome" component={GuestOrderTrackingScreen} />
+        </Stack.Navigator>
+    );
+}
+
+function GuestTabsInner() {
+    const { t } = useTranslation();
+    return (
+        <Tab.Navigator
+            screenOptions={buildTabScreenOptions({
+                ScannerTab: 'qr-code-scanner',
+                MenuTab: 'restaurant-menu',
+                CartTab: 'shopping-cart',
+                OrdersTab: 'receipt',
+                ProfileTab: 'person',
+            })}
+        >
+            <Tab.Screen name="ScannerTab" component={GuestScannerScreen} options={{ tabBarLabel: 'Стол' }} />
+            <Tab.Screen name="MenuTab" component={GuestMenuStack} options={{ tabBarLabel: 'Меню' }} />
+            <Tab.Screen name="CartTab" component={GuestCartStack} options={{ tabBarLabel: 'Корзина' }} />
+            <Tab.Screen name="OrdersTab" component={GuestOrderStack} options={{ tabBarLabel: 'Заказ' }} />
+            <Tab.Screen name="ProfileTab" component={GuestProfileScreen} options={{ tabBarLabel: 'Профиль' }} />
+        </Tab.Navigator>
+    );
+}
+
+function GuestTabs() {
+    return (
+        <CartProvider>
+            <GuestTabsInner />
+        </CartProvider>
+    );
+}
+
 function getRoleComponent(role) {
     switch (role) {
         case 'CHEF':
@@ -531,6 +597,8 @@ function getRoleComponent(role) {
             return AuditorTabs;
         case 'SUPPLIER':
             return SupplierTabs;
+        case 'GUEST':
+            return GuestTabs;
         default:
             return null;
     }
