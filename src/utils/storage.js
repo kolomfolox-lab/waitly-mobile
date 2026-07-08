@@ -1,22 +1,41 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
+import * as SecureStore from 'expo-secure-store';
 
 const isWeb = Platform.OS === 'web';
 
-const webStorage = {
+const KEY_PREFIX = 'waitly_';
+
+const secureStorage = {
   getItem: async (key) => {
-    try { return localStorage.getItem(key); } catch { return null; }
+    try { return await SecureStore.getItemAsync(KEY_PREFIX + key); } catch { return null; }
   },
   setItem: async (key, value) => {
-    try { localStorage.setItem(key, value); } catch {}
+    try { await SecureStore.setItemAsync(KEY_PREFIX + key, value); } catch {}
   },
   removeItem: async (key) => {
-    try { localStorage.removeItem(key); } catch {}
+    try { await SecureStore.deleteItemAsync(KEY_PREFIX + key); } catch {}
   },
   multiRemove: async (keys) => {
-    try { keys.forEach(k => localStorage.removeItem(k)); } catch {}
+    for (const key of keys) {
+      try { await SecureStore.deleteItemAsync(KEY_PREFIX + key); } catch {}
+    }
   },
 };
 
-const Storage = isWeb ? webStorage : AsyncStorage;
+const webStorage = {
+  getItem: async (key) => {
+    try { return sessionStorage.getItem(KEY_PREFIX + key); } catch { return null; }
+  },
+  setItem: async (key, value) => {
+    try { sessionStorage.setItem(KEY_PREFIX + key, value); } catch {}
+  },
+  removeItem: async (key) => {
+    try { sessionStorage.removeItem(KEY_PREFIX + key); } catch {}
+  },
+  multiRemove: async (keys) => {
+    try { keys.forEach(k => sessionStorage.removeItem(KEY_PREFIX + k)); } catch {}
+  },
+};
+
+const Storage = isWeb ? webStorage : secureStorage;
 export default Storage;

@@ -27,12 +27,18 @@
       "output": "single",
       "build": {
         "babel": {
-          "include": ["@twa-dev/sdk"]
+          "include": [
+            "@twa-dev/sdk"
+          ]
         }
       }
     },
+    "extra": {
+      "apiUrl": "https://api.moonlauncher.org/api/v1"
+    },
     "plugins": [
-      "expo-localization"
+      "expo-localization",
+      "expo-secure-store"
     ],
     "experiments": {
       "baseUrl": "/"

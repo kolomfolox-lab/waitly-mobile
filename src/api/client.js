@@ -1,22 +1,23 @@
 import axios from 'axios';
 import Storage from '../utils/storage';
-import { Alert } from 'react-native';
+import Constants from 'expo-constants';
 
-export const API_URL = 'https://api.moonlauncher.org/api/v1';
+const API_URL = Constants.expoConfig?.extra?.apiUrl || 'https://api.moonlauncher.org/api/v1';
 
 const client = axios.create({
     baseURL: API_URL,
+    timeout: 15000,
     headers: {
         'Content-Type': 'application/json',
     },
 });
 
 const clearAuthStorage = async () => {
-        await Storage.multiRemove(['access_token', 'refresh_token', 'user_role', 'user_data']);
+    await Storage.multiRemove(['access_token', 'refresh_token', 'user_role', 'user_data']);
 };
 
 client.interceptors.request.use(async (config) => {
-    const token = await Storage.getItem('access_token');
+    const token = await Storage.getItem('auth_access_token');
     if (token) {
         config.headers.Authorization = `Bearer ${token}`;
     }
@@ -32,9 +33,10 @@ client.interceptors.response.use(
             originalRequest._retry = true;
 
             try {
-                const refreshToken = await Storage.getItem('refresh_token');
+                const refreshToken = await Storage.getItem('auth_refresh_token');
                 if (!refreshToken) {
-                    throw error;
+                    await clearAuthStorage();
+                    return Promise.reject(error);
                 }
 
                 const refreshResponse = await axios.post(`${API_URL}/auth/refresh/`, {
@@ -42,9 +44,9 @@ client.interceptors.response.use(
                 });
 
                 const { access, refresh } = refreshResponse.data;
-                await Storage.setItem('access_token', access);
+                await Storage.setItem('auth_access_token', access);
                 if (refresh) {
-                    await Storage.setItem('refresh_token', refresh);
+                    await Storage.setItem('auth_refresh_token', refresh);
                 }
 
                 originalRequest.headers = originalRequest.headers || {};
@@ -58,10 +60,6 @@ client.interceptors.response.use(
 
         if (error.response?.status === 403) {
             await clearAuthStorage();
-            Alert.alert(
-                'Access changed',
-                error.response?.data?.error?.message || 'Your role or access changed. Please sign in again.'
-            );
         }
 
         return Promise.reject(error);

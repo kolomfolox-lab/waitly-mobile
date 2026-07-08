@@ -85,7 +85,6 @@ export const AuthProvider = ({ children }) => {
             await applyUserData(userData);
             return true;
         } catch (error) {
-            console.error('Login failed:', error.response?.data || error.message);
             throw error;
         }
     };
@@ -109,7 +108,6 @@ export const AuthProvider = ({ children }) => {
             await applyUserData(userData);
             return true;
         } catch (error) {
-            console.error('Telegram login failed:', error.response?.data || error.message);
             throw error;
         }
     };
@@ -129,7 +127,6 @@ export const AuthProvider = ({ children }) => {
             await applyUserData(userData);
             return true;
         } catch (error) {
-            console.error('Telegram link failed:', error.response?.data || error.message);
             throw error;
         }
     };

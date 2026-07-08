@@ -1,7 +1,8 @@
 import axios from 'axios';
 import Storage from '../utils/storage';
+import Constants from 'expo-constants';
 
-const API_BASE_URL = 'https://api.moonlauncher.org';
+const API_BASE_URL = Constants.expoConfig?.extra?.apiUrl || 'https://api.moonlauncher.org';
 
 const apiClient = axios.create({
     baseURL: API_BASE_URL,
@@ -11,7 +12,6 @@ const apiClient = axios.create({
     },
 });
 
-// Request interceptor — attach JWT token
 apiClient.interceptors.request.use(
     async (config) => {
         try {
@@ -20,26 +20,40 @@ apiClient.interceptors.request.use(
                 config.headers.Authorization = `Bearer ${token}`;
             }
         } catch (e) {
-            console.log('Error reading auth token:', e);
+            // Silent fail
         }
         return config;
     },
     (error) => Promise.reject(error)
 );
 
-// Response interceptor — handle 401
 apiClient.interceptors.response.use(
     (response) => response,
     async (error) => {
         if (error.response?.status === 401) {
-            // Token expired — clear storage, app will redirect to login
+            try {
+                const refreshToken = await Storage.getItem('auth_refresh_token');
+                if (refreshToken) {
+                    const refreshResponse = await axios.post(`${API_BASE_URL}/api/auth/refresh/`, {
+                        refresh: refreshToken,
+                    });
+                    const { access, refresh } = refreshResponse.data;
+                    await Storage.setItem('auth_access_token', access);
+                    if (refresh) {
+                        await Storage.setItem('auth_refresh_token', refresh);
+                    }
+                    error.config.headers.Authorization = `Bearer ${access}`;
+                    return apiClient(error.config);
+                }
+            } catch {
+                // Fall through to clear
+            }
             await Storage.multiRemove([
                 'auth_access_token',
                 'auth_refresh_token',
                 'user_role',
                 'user_data',
             ]);
-            // Let the calling code handle the redirect
         }
         return Promise.reject(error);
     }
