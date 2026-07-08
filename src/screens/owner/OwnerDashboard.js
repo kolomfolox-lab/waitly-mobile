@@ -35,7 +35,7 @@ const COLORS = {
 const { width } = Dimensions.get('window');
 
 export default function OwnerDashboard({ navigation }) {
-    const { user } = useAuth();
+    const { user, subscriptionLock } = useAuth();
     const [stats, setStats] = useState(null);
     const [todayOrders, setTodayOrders] = useState([]);
     const [dishes, setDishes] = useState([]);
@@ -107,9 +107,19 @@ export default function OwnerDashboard({ navigation }) {
                                 <Text style={styles.headerSub}>{networkName}</Text>
                             </View>
                         </View>
-                        <TouchableOpacity style={styles.calendarBtn}>
-                            <MaterialIcons name="date-range" size={24} color={COLORS.primary} />
-                        </TouchableOpacity>
+                        <View style={styles.headerActions}>
+                            {subscriptionLock.blocked ? (
+                                <View style={styles.subscriptionWarning}>
+                                    <MaterialIcons name="warning" size={14} color="#fff" />
+                                    <Text style={styles.subscriptionWarningText}>Нет подписки</Text>
+                                </View>
+                            ) : subscriptionLock.subscriptionExpiresAt ? (
+                                <Text style={styles.subscriptionActive}>Активна до {new Date(subscriptionLock.subscriptionExpiresAt).toLocaleDateString('ru-RU')}</Text>
+                            ) : null}
+                            <TouchableOpacity style={styles.calendarBtn}>
+                                <MaterialIcons name="date-range" size={24} color={COLORS.primary} />
+                            </TouchableOpacity>
+                        </View>
                     </View>
 
                     {/* Overview Header */}
@@ -258,6 +268,18 @@ const styles = StyleSheet.create({
         flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
         paddingHorizontal: 24, paddingTop: 20, paddingBottom: 24,
     },
+    headerActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    subscriptionWarning: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        backgroundColor: COLORS.danger,
+        borderRadius: 8,
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+    },
+    subscriptionWarningText: { fontSize: 11, fontWeight: '700', color: '#fff' },
+    subscriptionActive: { fontSize: 11, fontWeight: '600', color: COLORS.success },
     headerTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
     logoIcon: {
         width: 36, height: 36, backgroundColor: COLORS.primary, borderRadius: 12,
