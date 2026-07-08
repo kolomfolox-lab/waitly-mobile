@@ -12,6 +12,7 @@ import {
     Image
 } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
+import apiClient from '../../api/apiClient';
 import { MaterialIcons } from '@expo/vector-icons';
 
 const COLORS = {
@@ -104,8 +105,8 @@ export default function StaffManagementScreen({ navigation }) {
     const onRefresh = React.useCallback(async () => {
         setRefreshing(true);
         try {
-            const res = await fetch('/api/owner/staff/');
-            const data = await res.json();
+            const res = await apiClient.get('/api/owner/staff/');
+            const data = res.data;
             setStaff(data);
         } catch {
             setStaff([]);

@@ -57,14 +57,18 @@ export const AuthProvider = ({ children }) => {
 
     const loadStorageData = async () => {
         try {
-            await Storage.multiRemove([
-                'auth_access_token',
-                'auth_refresh_token',
-                'user_role',
-                'user_data',
-            ]);
+            const token = await Storage.getItem('auth_access_token');
+            const savedRole = await Storage.getItem('user_role');
+            const savedUser = await Storage.getItem('user_data');
+
+            if (token && savedUser) {
+                setUser(JSON.parse(savedUser));
+                setRole(savedRole);
+                const subscriptionState = getRestaurantSubscription(JSON.parse(savedUser));
+                setSubscriptionLock(subscriptionState);
+            }
         } catch (e) {
-            console.log('Failed to clear auth data:', e);
+            // Silently handle — user will need to log in again
         } finally {
             setLoading(false);
         }

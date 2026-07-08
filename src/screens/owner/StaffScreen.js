@@ -114,7 +114,7 @@ export default function StaffScreen() {
     };
 
     const submitNewStaff = async (fullName, phone, role) => {
-        const tempPassword = Math.random().toString(36).slice(-10) + 'A1!';
+        const array = new Uint32Array(4); crypto.getRandomValues(array); const tempPassword = Array.from(array, (v) => v.toString(36)).join('').slice(0, 10) + 'A1!';
         try {
             await createStaff({
                 full_name: fullName,

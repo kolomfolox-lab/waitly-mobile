@@ -13,7 +13,7 @@ const client = axios.create({
 });
 
 const clearAuthStorage = async () => {
-    await Storage.multiRemove(['access_token', 'refresh_token', 'user_role', 'user_data']);
+    await Storage.multiRemove(['auth_access_token', 'auth_refresh_token', 'user_role', 'user_data']);
 };
 
 client.interceptors.request.use(async (config) => {
