@@ -78,7 +78,7 @@ export default function ChefDashboard() {
             seenOrderIds.current = new Set(nextOrders.map((order) => order.id));
             setOrders(nextOrders);
         } catch (error) {
-            console.error('Failed to load kitchen orders:', error);
+            //
             if (!silent) {
                 Alert.alert('Kitchen offline', 'Could not load orders. Check connection and try again.');
             }
@@ -113,7 +113,9 @@ export default function ChefDashboard() {
         const cooking = orders.filter((order) => order.status === ORDER_STATUS.ACCEPTED || order.status === ORDER_STATUS.COOKING).length;
         const ready = orders.filter((order) => order.status === ORDER_STATUS.READY).length;
         const urgent = orders.filter((order) => ['late', 'critical'].includes(getUrgency(order))).length;
-        return { open, cooking, ready, urgent };
+        const completed = orders.filter((order) => order.status === ORDER_STATUS.DELIVERED).length;
+        const total = orders.length;
+        return { open, cooking, ready, urgent, completed, total };
     }, [orders, clockTick]);
 
     const handleAction = async (order) => {
@@ -257,7 +259,19 @@ export default function ChefDashboard() {
                     <Text style={[styles.statValue, stats.urgent > 0 && styles.statValueUrgent]}>{stats.urgent}</Text>
                     <Text style={styles.statLabel}>Late</Text>
                 </View>
+                <View style={styles.statCard}>
+                    <Text style={[styles.statValue, { color: COLORS.success }]}>{stats.completed}</Text>
+                    <Text style={styles.statLabel}>Done</Text>
+                </View>
             </View>
+            {stats.total > 0 ? (
+                <View style={styles.progressWrap}>
+                    <View style={styles.progressTrack}>
+                        <View style={[styles.progressFill, { width: `${Math.round((stats.completed / stats.total) * 100)}%` }]} />
+                    </View>
+                    <Text style={styles.progressLabel}>{Math.round((stats.completed / stats.total) * 100)}% complete</Text>
+                </View>
+            ) : null}
 
             {lastAlertAt && (
                 <View style={styles.alertStrip}>
@@ -377,6 +391,31 @@ const styles = StyleSheet.create({
         color: COLORS.muted,
         fontWeight: '800',
         marginTop: 2,
+    },
+    progressWrap: {
+        marginHorizontal: 16,
+        marginTop: 10,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+    },
+    progressTrack: {
+        flex: 1,
+        height: 6,
+        backgroundColor: COLORS.border,
+        borderRadius: 3,
+        overflow: 'hidden',
+    },
+    progressFill: {
+        height: '100%',
+        backgroundColor: COLORS.success,
+        borderRadius: 3,
+    },
+    progressLabel: {
+        fontSize: 11,
+        fontWeight: '700',
+        color: COLORS.muted,
+        textTransform: 'uppercase',
     },
     alertStrip: {
         marginHorizontal: 16,
