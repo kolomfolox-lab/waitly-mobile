@@ -140,11 +140,19 @@ export default function GuestMenuScreen({ navigation }) {
                                 </View>
                             )}
                             <View style={styles.dishInfo}>
-                                <Text style={styles.dishName} numberOfLines={2}>{dish.name}</Text>
+                                <View style={styles.dishNameRow}>
+                                    <Text style={styles.dishName} numberOfLines={2}>{dish.name}</Text>
+                                    {dish.is_popular || dish.order_count > 50 ? (
+                                        <View style={styles.popularBadge}>
+                                            <MaterialIcons name="star" size={10} color="#fff" />
+                                            <Text style={styles.popularBadgeText}>Популярное</Text>
+                                        </View>
+                                    ) : null}
+                                </View>
                                 {dish.description ? (
                                     <Text style={styles.dishDescription} numberOfLines={2}>{dish.description}</Text>
                                 ) : null}
-                                <Text style={styles.dishPrice}>{dish.price} UZS</Text>
+                                <Text style={styles.dishPrice}>{Number(dish.price).toLocaleString()} UZS</Text>
                             </View>
                             <TouchableOpacity
                                 style={styles.addButton}
@@ -311,10 +319,31 @@ const styles = StyleSheet.create({
         marginLeft: 12,
         marginRight: 8,
     },
+    dishNameRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+    },
     dishName: {
         fontSize: 15,
         fontWeight: '600',
         color: COLORS.text,
+        flexShrink: 1,
+    },
+    popularBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 3,
+        backgroundColor: COLORS.primary,
+        borderRadius: 8,
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+    },
+    popularBadgeText: {
+        fontSize: 9,
+        fontWeight: '800',
+        color: '#fff',
+        textTransform: 'uppercase',
     },
     dishDescription: {
         fontSize: 12,
