@@ -237,6 +237,12 @@ export default function WaiterDashboard({ navigation }) {
                             <Text style={styles.summaryTotalLabel}>Сумма заказов</Text>
                             <Text style={styles.summaryTotalValue}>{formatCurrency(stats.todaySummary.amount)}</Text>
                         </View>
+                        <View style={styles.shiftProgress}>
+                            <View style={styles.shiftProgressTrack}>
+                                <View style={[styles.shiftProgressFill, { width: `${Math.min((stats.orders.active / 20) * 100, 100)}%` }]} />
+                            </View>
+                            <Text style={styles.shiftProgressText}>{stats.orders.active} заказов за смену</Text>
+                        </View>
                     </LinearGradient>
                 </Animated.View>
 
@@ -406,6 +412,28 @@ const styles = StyleSheet.create({
         fontSize: 18,
         fontWeight: '800',
         color: COLORS.white,
+    },
+    shiftProgress: {
+        marginTop: 12,
+        gap: 6,
+    },
+    shiftProgressTrack: {
+        height: 6,
+        backgroundColor: 'rgba(255,255,255,0.25)',
+        borderRadius: 3,
+        overflow: 'hidden',
+    },
+    shiftProgressFill: {
+        height: '100%',
+        backgroundColor: 'rgba(255,255,255,0.7)',
+        borderRadius: 3,
+    },
+    shiftProgressText: {
+        fontSize: 11,
+        fontWeight: '600',
+        color: 'rgba(255,255,255,0.7)',
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
     },
     statsGrid: {
         flexDirection: 'row',
