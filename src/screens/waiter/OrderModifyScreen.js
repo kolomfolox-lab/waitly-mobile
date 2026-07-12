@@ -14,8 +14,7 @@ import {
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
-import { getOrders, acceptOrder, deliverOrder } from '../../api/apiService';
-import { startCookingOrder, markOrderReady } from '../../api/orders';
+import { getOrders, deliverOrder } from '../../api/apiService';
 import apiClient from '../../api/apiClient';
 
 const COLORS = {
@@ -167,10 +166,7 @@ export default function OrderModifyScreen({ route, navigation }) {
 
     const updateOrderStatus = async (orderId, action) => {
         try {
-            if (action === 'accept') await acceptOrder(orderId);
-            else if (action === 'cooking') await startCookingOrder(orderId);
-            else if (action === 'ready') await markOrderReady(orderId);
-            else if (action === 'deliver') await deliverOrder(orderId);
+            if (action === 'deliver') await deliverOrder(orderId);
             await fetchData();
         } catch (e) {
             Alert.alert('Ошибка', 'Не удалось обновить статус');
@@ -302,7 +298,7 @@ export default function OrderModifyScreen({ route, navigation }) {
                             <Text style={styles.unifiedTotalAmount}>{formatCurrency(subtotal)}</Text>
                         </View>
 
-                        {hasActiveOrders && (
+                        {orders.filter(o => o.status === 'READY').length > 0 && (
                             <View style={styles.unifiedActions}>
                                 {orders.filter(o => o.status === 'READY').map(o => (
                                     <TouchableOpacity
@@ -312,16 +308,6 @@ export default function OrderModifyScreen({ route, navigation }) {
                                     >
                                         <MaterialIcons name="local-shipping" size={16} color={COLORS.white} />
                                         <Text style={styles.actionBtnSmallText}>Доставить</Text>
-                                    </TouchableOpacity>
-                                ))}
-                                {orders.filter(o => o.status === 'CREATED').map(o => (
-                                    <TouchableOpacity
-                                        key={o.id}
-                                        style={[styles.actionBtnSmall, { backgroundColor: COLORS.primary }]}
-                                        onPress={() => updateOrderStatus(o.id, 'accept')}
-                                    >
-                                        <MaterialIcons name="check" size={16} color={COLORS.white} />
-                                        <Text style={styles.actionBtnSmallText}>Принять</Text>
                                     </TouchableOpacity>
                                 ))}
                             </View>
