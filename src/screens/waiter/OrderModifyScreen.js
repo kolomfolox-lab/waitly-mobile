@@ -2,6 +2,7 @@ import React, { useState, useCallback } from 'react';
 import {
     View,
     Text,
+    Image,
     StyleSheet,
     TouchableOpacity,
     SafeAreaView,
@@ -13,7 +14,7 @@ import {
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
-import { getOrders, acceptOrder, deliverOrder, markPaid } from '../../api/apiService';
+import { getOrders, acceptOrder, deliverOrder } from '../../api/apiService';
 import { startCookingOrder, markOrderReady } from '../../api/orders';
 import apiClient from '../../api/apiClient';
 
@@ -111,17 +112,24 @@ function BillModal({ visible, onClose, tableNumber, billData, serviceChargePerce
                             <Text style={styles.billGrandValue}>{formatCurrency(grandTotal)}</Text>
                         </View>
 
-                        {billData.payment_method === 'qr' && billData.payment_url ? (
+                        {billData.payment_method === 'qr' ? (
                             <View style={styles.qrSection}>
-                                <View style={styles.qrPlaceholder}>
-                                    <MaterialIcons name="qr-code" size={120} color={COLORS.textDark} />
-                                </View>
+                                {billData.payment_url ? (
+                                    <Image
+                                        source={{ uri: `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(billData.payment_url)}` }}
+                                        style={styles.qrImage}
+                                    />
+                                ) : (
+                                    <View style={styles.qrPlaceholder}>
+                                        <MaterialIcons name="qr-code" size={120} color={COLORS.textDark} />
+                                    </View>
+                                )}
                                 <Text style={styles.qrHint}>Гость сканирует QR для оплаты</Text>
                             </View>
                         ) : billData.payment_method === 'cash' ? (
                             <View style={styles.cashSection}>
                                 <MaterialIcons name="payments" size={48} color={COLORS.success} />
-                                <Text style={styles.cashHint}>Оплата наличными на кассе</Text>
+                                <Text style={styles.cashHint}>Оплачено наличными</Text>
                             </View>
                         ) : null}
 
@@ -185,7 +193,6 @@ export default function OrderModifyScreen({ route, navigation }) {
             else if (action === 'cooking') await startCookingOrder(orderId);
             else if (action === 'ready') await markOrderReady(orderId);
             else if (action === 'deliver') await deliverOrder(orderId);
-            else if (action === 'paid') await markPaid(orderId);
             await fetchData();
         } catch (e) {
             Alert.alert('Ошибка', 'Не удалось обновить статус');
@@ -202,8 +209,6 @@ export default function OrderModifyScreen({ route, navigation }) {
                 return [{ key: 'ready', label: 'Готов', icon: 'done', color: COLORS.success }];
             case 'READY':
                 return [{ key: 'deliver', label: 'Доставлено', icon: 'local-shipping', color: COLORS.primary }];
-            case 'AWAITING_PAYMENT':
-                return [{ key: 'paid', label: 'Оплачено', icon: 'check-circle', color: COLORS.success }];
             default:
                 return [];
         }
@@ -233,7 +238,7 @@ export default function OrderModifyScreen({ route, navigation }) {
                 data: {
                     items: allItems,
                     payment_method: paymentMethod,
-                    payment_url: paymentMethod === 'qr' ? `/api/v1/guest/payment/init/?order_id=${bill.orders_billed?.[0] || ''}` : null,
+                    payment_url: bill.payment_url || null,
                 },
             });
             await fetchData();
@@ -684,6 +689,12 @@ const styles = StyleSheet.create({
     qrSection: {
         alignItems: 'center',
         paddingVertical: 20,
+    },
+    qrImage: {
+        width: 220,
+        height: 220,
+        borderRadius: 16,
+        backgroundColor: COLORS.white,
     },
     qrPlaceholder: {
         width: 160,
