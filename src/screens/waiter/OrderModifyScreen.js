@@ -30,39 +30,19 @@ const COLORS = {
     danger: '#EE5A6F',
 };
 
-const STATUS_LABELS = {
-    CREATED: 'Новый',
-    ACCEPTED: 'Принят',
-    COOKING: 'Готовится',
-    READY: 'Готов',
-    DELIVERED: 'Доставлен',
-    AWAITING_PAYMENT: 'Ожидает оплаты',
-    PAID: 'Оплачен',
-    CANCELLED: 'Отменён',
-};
-
-const STATUS_COLORS = {
-    CREATED: COLORS.textMuted,
-    ACCEPTED: COLORS.primary,
-    COOKING: COLORS.warning,
-    READY: COLORS.success,
-    DELIVERED: COLORS.textMuted,
-    AWAITING_PAYMENT: COLORS.warning,
-    PAID: COLORS.success,
-    CANCELLED: COLORS.danger,
-};
-
-function BillModal({ visible, onClose, tableNumber, billData, serviceChargePercent }) {
+function BillModal({ visible, onClose, tableNumber, billData }) {
     if (!billData) return null;
-
-    const subtotal = (billData.items || []).reduce((sum, item) => sum + (parseFloat(item.price) || 0) * (item.quantity || 1), 0);
-    const serviceChargeAmount = Math.round(subtotal * serviceChargePercent / 100);
-    const grandTotal = subtotal + serviceChargeAmount;
 
     const formatCurrency = (val) => {
         const num = typeof val === 'string' ? parseFloat(val) : (val || 0);
         return Math.round(num).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ') + ' сум';
     };
+
+    const items = billData.items || [];
+    const subtotal = items.reduce((sum, item) => sum + (parseFloat(item.price) || 0) * (item.quantity || 1), 0);
+    const servicePercent = billData.service_charge_percent || 0;
+    const serviceAmount = Math.round(subtotal * servicePercent / 100);
+    const grandTotal = subtotal + serviceAmount;
 
     return (
         <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
@@ -79,15 +59,13 @@ function BillModal({ visible, onClose, tableNumber, billData, serviceChargePerce
                         <Text style={styles.billTableInfo}>Стол {tableNumber}</Text>
                         <View style={styles.billDivider} />
 
-                        {(billData.items || []).map((item, idx) => (
-                            <View key={item.id || idx} style={styles.billItemRow}>
+                        {items.map((item, idx) => (
+                            <View key={idx} style={styles.billItemRow}>
                                 <View style={styles.billItemLeft}>
                                     <Text style={styles.billItemQty}>{item.quantity}×</Text>
                                     <View style={styles.billItemInfo}>
                                         <Text style={styles.billItemName}>{item.dish_name || 'Блюдо'}</Text>
-                                        {item.notes ? (
-                                            <Text style={styles.billItemNotes}>{item.notes}</Text>
-                                        ) : null}
+                                        {item.notes ? <Text style={styles.billItemNotes}>{item.notes}</Text> : null}
                                     </View>
                                 </View>
                                 <Text style={styles.billItemPrice}>{formatCurrency((parseFloat(item.price) || 0) * (item.quantity || 1))}</Text>
@@ -100,10 +78,10 @@ function BillModal({ visible, onClose, tableNumber, billData, serviceChargePerce
                             <Text style={styles.billTotalValue}>{formatCurrency(subtotal)}</Text>
                         </View>
 
-                        {serviceChargePercent > 0 && (
+                        {servicePercent > 0 && (
                             <View style={styles.billTotalRow}>
-                                <Text style={styles.billTotalLabel}>Сервисный сбор ({serviceChargePercent}%)</Text>
-                                <Text style={styles.billTotalValue}>{formatCurrency(serviceChargeAmount)}</Text>
+                                <Text style={styles.billTotalLabel}>Сервисный сбор ({servicePercent}%)</Text>
+                                <Text style={styles.billTotalValue}>{formatCurrency(serviceAmount)}</Text>
                             </View>
                         )}
 
@@ -112,26 +90,20 @@ function BillModal({ visible, onClose, tableNumber, billData, serviceChargePerce
                             <Text style={styles.billGrandValue}>{formatCurrency(grandTotal)}</Text>
                         </View>
 
-                        {billData.payment_method === 'qr' ? (
+                        {billData.payment_url ? (
                             <View style={styles.qrSection}>
-                                {billData.payment_url ? (
-                                    <Image
-                                        source={{ uri: `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(billData.payment_url)}` }}
-                                        style={styles.qrImage}
-                                    />
-                                ) : (
-                                    <View style={styles.qrPlaceholder}>
-                                        <MaterialIcons name="qr-code" size={120} color={COLORS.textDark} />
-                                    </View>
-                                )}
+                                <Image
+                                    source={{ uri: `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(billData.payment_url)}` }}
+                                    style={styles.qrImage}
+                                />
                                 <Text style={styles.qrHint}>Гость сканирует QR для оплаты</Text>
                             </View>
-                        ) : billData.payment_method === 'cash' ? (
+                        ) : (
                             <View style={styles.cashSection}>
                                 <MaterialIcons name="payments" size={48} color={COLORS.success} />
                                 <Text style={styles.cashHint}>Оплачено наличными</Text>
                             </View>
-                        ) : null}
+                        )}
 
                         <TouchableOpacity style={styles.billCloseBtn} onPress={onClose}>
                             <Text style={styles.billCloseBtnText}>Закрыть</Text>
@@ -160,7 +132,6 @@ export default function OrderModifyScreen({ route, navigation }) {
             ]);
             const list = ordersData.results || ordersData || [];
             setOrders(Array.isArray(list) ? list : []);
-
             if (homeData?.data?.restaurant?.service_charge_percent) {
                 setServiceChargePercent(parseFloat(homeData.data.restaurant.service_charge_percent));
             }
@@ -199,22 +170,19 @@ export default function OrderModifyScreen({ route, navigation }) {
         }
     };
 
-    const statusActions = (status) => {
-        switch (status) {
-            case 'CREATED':
-                return [{ key: 'accept', label: 'Принять', icon: 'check', color: COLORS.primary }];
-            case 'ACCEPTED':
-                return [{ key: 'cooking', label: 'Готовится', icon: 'restaurant', color: COLORS.warning }];
-            case 'COOKING':
-                return [{ key: 'ready', label: 'Готов', icon: 'done', color: COLORS.success }];
-            case 'READY':
-                return [{ key: 'deliver', label: 'Доставлено', icon: 'local-shipping', color: COLORS.primary }];
-            default:
-                return [];
-        }
-    };
-
     const hasDeliveredOrders = orders.some(o => o.status === 'DELIVERED');
+    const hasActiveOrders = orders.some(o => ['CREATED', 'ACCEPTED', 'COOKING', 'READY'].includes(o.status));
+
+    const allItems = orders.flatMap(o =>
+        (o.items || []).map(i => ({
+            ...i,
+            _orderStatus: o.status,
+            _orderId: o.id,
+            _orderTime: o.created_at,
+        }))
+    );
+
+    const subtotal = allItems.reduce((sum, item) => sum + (parseFloat(item.price) || 0) * (item.quantity || 1), 0);
 
     const issueBill = async (paymentMethod) => {
         setShowBillOptions(false);
@@ -229,16 +197,16 @@ export default function OrderModifyScreen({ route, navigation }) {
 
             const ordersData = await getOrders({ table: tableId });
             const list = ordersData.results || ordersData || [];
-            const allItems = (Array.isArray(list) ? list : []).flatMap(o =>
-                (o.items || []).map(i => ({ ...i, order_status: o.status }))
+            const newItems = (Array.isArray(list) ? list : []).flatMap(o =>
+                (o.items || []).map(i => ({ ...i }))
             );
 
             setBillModal({
                 visible: true,
                 data: {
-                    items: allItems,
-                    payment_method: paymentMethod,
+                    items: newItems,
                     payment_url: bill.payment_url || null,
+                    service_charge_percent: percent,
                 },
             });
             await fetchData();
@@ -246,6 +214,8 @@ export default function OrderModifyScreen({ route, navigation }) {
             Alert.alert('Ошибка', 'Не удалось выставить счёт');
         }
     };
+
+    const orderStatus = orders.length > 0 ? orders[0].status : null;
 
     return (
         <SafeAreaView style={styles.container}>
@@ -256,18 +226,12 @@ export default function OrderModifyScreen({ route, navigation }) {
                 <Text style={styles.headerTitle}>Стол {tableNumber}</Text>
                 <View style={styles.headerActions}>
                     {hasDeliveredOrders && (
-                        <TouchableOpacity
-                            style={styles.billHeaderBtn}
-                            onPress={() => setShowBillOptions(true)}
-                        >
-                            <MaterialIcons name="receipt" size={20} color={COLORS.white} />
+                        <TouchableOpacity style={styles.billHeaderBtn} onPress={() => setShowBillOptions(true)}>
+                            <MaterialIcons name="receipt" size={18} color={COLORS.white} />
                             <Text style={styles.billHeaderBtnText}>Счёт</Text>
                         </TouchableOpacity>
                     )}
-                    <TouchableOpacity
-                        style={styles.addBtn}
-                        onPress={() => navigation.navigate('OrderCreation', { tableNumber, tableId })}
-                    >
+                    <TouchableOpacity style={styles.addBtn} onPress={() => navigation.navigate('OrderCreation', { tableNumber, tableId })}>
                         <MaterialIcons name="add" size={22} color={COLORS.white} />
                     </TouchableOpacity>
                 </View>
@@ -279,10 +243,7 @@ export default function OrderModifyScreen({ route, navigation }) {
                 <View style={styles.center}>
                     <MaterialIcons name="receipt-long" size={48} color={COLORS.textMuted} />
                     <Text style={styles.emptyText}>Нет заказов</Text>
-                    <TouchableOpacity
-                        style={styles.emptyAddBtn}
-                        onPress={() => navigation.navigate('OrderCreation', { tableNumber, tableId })}
-                    >
+                    <TouchableOpacity style={styles.emptyAddBtn} onPress={() => navigation.navigate('OrderCreation', { tableNumber, tableId })}>
                         <Text style={styles.emptyAddBtnText}>Создать заказ</Text>
                     </TouchableOpacity>
                 </View>
@@ -295,58 +256,69 @@ export default function OrderModifyScreen({ route, navigation }) {
                     }
                     showsVerticalScrollIndicator={false}
                 >
-                    {orders.map(order => (
-                        <View key={order.id} style={styles.orderCard}>
-                            <View style={styles.orderHeader}>
-                                <View style={[styles.statusBadge, { backgroundColor: (STATUS_COLORS[order.status] || COLORS.textMuted) + '20' }]}>
-                                    <Text style={[styles.statusText, { color: STATUS_COLORS[order.status] || COLORS.textMuted }]}>
-                                        {STATUS_LABELS[order.status] || order.status}
+                    <View style={styles.unifiedCard}>
+                        <View style={styles.unifiedHeader}>
+                            <Text style={styles.unifiedTitle}>Заказ стола {tableNumber}</Text>
+                            {orders.every(o => o.status === 'DELIVERED' || o.status === 'AWAITING_PAYMENT' || o.status === 'PAID') ? null : (
+                                <TouchableOpacity
+                                    style={[styles.statusBadgeSmall, { backgroundColor: hasActiveOrders ? (COLORS.warning + '20') : (COLORS.success + '20') }]}
+                                    onPress={() => {}}
+                                >
+                                    <Text style={[styles.statusBadgeSmallText, { color: hasActiveOrders ? COLORS.warning : COLORS.success }]}>
+                                        {hasActiveOrders ? 'Готовится' : 'Завершён'}
                                     </Text>
-                                </View>
-                                <Text style={styles.orderTime}>{getTimeAgo(order.created_at)}</Text>
-                            </View>
-
-                            {(order.items || []).map((item, idx) => (
-                                <View key={item.id || idx} style={styles.itemRow}>
-                                    <View style={styles.itemLeft}>
-                                        <Text style={styles.itemQty}>{item.quantity}×</Text>
-                                        <View>
-                                            <Text style={styles.itemName}>{item.dish_name || 'Блюдо'}</Text>
-                                            {item.notes ? (
-                                                <Text style={styles.itemNotes}>
-                                                    <MaterialIcons name="edit-note" size={13} color={COLORS.warning} />
-                                                    {' '}{item.notes}
-                                                </Text>
-                                            ) : null}
-                                        </View>
-                                    </View>
-                                    <Text style={styles.itemPrice}>{formatCurrency(item.price * item.quantity)}</Text>
-                                </View>
-                            ))}
-
-                            {order.total_amount ? (
-                                <View style={styles.totalRow}>
-                                    <Text style={styles.totalLabel}>Итого</Text>
-                                    <Text style={styles.totalAmount}>{formatCurrency(order.total_amount)}</Text>
-                                </View>
-                            ) : null}
-
-                            {statusActions(order.status).length > 0 && (
-                                <View style={styles.actionRow}>
-                                    {statusActions(order.status).map((action) => (
-                                        <TouchableOpacity
-                                            key={action.key}
-                                            style={[styles.actionBtn, { backgroundColor: action.color }]}
-                                            onPress={() => updateOrderStatus(order.id, action.key)}
-                                        >
-                                            <MaterialIcons name={action.icon} size={18} color={COLORS.white} />
-                                            <Text style={styles.actionBtnText}>{action.label}</Text>
-                                        </TouchableOpacity>
-                                    ))}
-                                </View>
+                                </TouchableOpacity>
                             )}
                         </View>
-                    ))}
+
+                        {allItems.map((item, idx) => (
+                            <View key={idx} style={styles.itemRow}>
+                                <View style={styles.itemLeft}>
+                                    <Text style={styles.itemQty}>{item.quantity}×</Text>
+                                    <View>
+                                        <Text style={styles.itemName}>{item.dish_name || 'Блюдо'}</Text>
+                                        {item.notes ? (
+                                            <Text style={styles.itemNotes}>
+                                                <MaterialIcons name="edit-note" size={13} color={COLORS.warning} />
+                                                {' '}{item.notes}
+                                            </Text>
+                                        ) : null}
+                                    </View>
+                                </View>
+                                <Text style={styles.itemPrice}>{formatCurrency((parseFloat(item.price) || 0) * (item.quantity || 1))}</Text>
+                            </View>
+                        ))}
+
+                        <View style={styles.unifiedTotalRow}>
+                            <Text style={styles.unifiedTotalLabel}>Итого по столу</Text>
+                            <Text style={styles.unifiedTotalAmount}>{formatCurrency(subtotal)}</Text>
+                        </View>
+
+                        {hasActiveOrders && (
+                            <View style={styles.unifiedActions}>
+                                {orders.filter(o => o.status === 'READY').map(o => (
+                                    <TouchableOpacity
+                                        key={o.id}
+                                        style={styles.actionBtnSmall}
+                                        onPress={() => updateOrderStatus(o.id, 'deliver')}
+                                    >
+                                        <MaterialIcons name="local-shipping" size={16} color={COLORS.white} />
+                                        <Text style={styles.actionBtnSmallText}>Доставить</Text>
+                                    </TouchableOpacity>
+                                ))}
+                                {orders.filter(o => o.status === 'CREATED').map(o => (
+                                    <TouchableOpacity
+                                        key={o.id}
+                                        style={[styles.actionBtnSmall, { backgroundColor: COLORS.primary }]}
+                                        onPress={() => updateOrderStatus(o.id, 'accept')}
+                                    >
+                                        <MaterialIcons name="check" size={16} color={COLORS.white} />
+                                        <Text style={styles.actionBtnSmallText}>Принять</Text>
+                                    </TouchableOpacity>
+                                ))}
+                            </View>
+                        )}
+                    </View>
                 </ScrollView>
             )}
 
@@ -380,7 +352,6 @@ export default function OrderModifyScreen({ route, navigation }) {
                 onClose={() => setBillModal({ visible: false, data: null })}
                 tableNumber={tableNumber}
                 billData={billModal.data}
-                serviceChargePercent={serviceChargePercent}
             />
         </SafeAreaView>
     );
@@ -468,18 +439,17 @@ const styles = StyleSheet.create({
         paddingHorizontal: 16,
         paddingBottom: 24,
     },
-    orderCard: {
+    unifiedCard: {
         backgroundColor: COLORS.white,
         borderRadius: 16,
         padding: 16,
-        marginBottom: 12,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.04,
         shadowRadius: 8,
         elevation: 2,
     },
-    orderHeader: {
+    unifiedHeader: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
@@ -488,18 +458,19 @@ const styles = StyleSheet.create({
         borderBottomWidth: 1,
         borderBottomColor: COLORS.slate100,
     },
-    statusBadge: {
+    unifiedTitle: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: COLORS.textDark,
+    },
+    statusBadgeSmall: {
         paddingHorizontal: 10,
         paddingVertical: 4,
         borderRadius: 8,
     },
-    statusText: {
+    statusBadgeSmallText: {
         fontSize: 12,
         fontWeight: '700',
-    },
-    orderTime: {
-        fontSize: 12,
-        color: COLORS.textMuted,
     },
     itemRow: {
         flexDirection: 'row',
@@ -534,26 +505,26 @@ const styles = StyleSheet.create({
         fontWeight: '700',
         color: COLORS.textDark,
     },
-    totalRow: {
+    unifiedTotalRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        paddingTop: 10,
+        paddingTop: 12,
         marginTop: 8,
-        borderTopWidth: 1,
-        borderTopColor: COLORS.slate100,
+        borderTopWidth: 2,
+        borderTopColor: COLORS.textDark,
     },
-    totalLabel: {
-        fontSize: 15,
-        fontWeight: '600',
-        color: COLORS.textMuted,
-    },
-    totalAmount: {
-        fontSize: 18,
+    unifiedTotalLabel: {
+        fontSize: 16,
         fontWeight: '800',
+        color: COLORS.textDark,
+    },
+    unifiedTotalAmount: {
+        fontSize: 20,
+        fontWeight: '900',
         color: COLORS.primary,
     },
-    actionRow: {
+    unifiedActions: {
         flexDirection: 'row',
         gap: 10,
         marginTop: 14,
@@ -561,7 +532,7 @@ const styles = StyleSheet.create({
         borderTopWidth: 1,
         borderTopColor: COLORS.slate100,
     },
-    actionBtn: {
+    actionBtnSmall: {
         flex: 1,
         flexDirection: 'row',
         alignItems: 'center',
@@ -569,8 +540,9 @@ const styles = StyleSheet.create({
         gap: 6,
         paddingVertical: 12,
         borderRadius: 12,
+        backgroundColor: COLORS.success,
     },
-    actionBtnText: {
+    actionBtnSmallText: {
         color: COLORS.white,
         fontSize: 14,
         fontWeight: '700',
@@ -695,19 +667,6 @@ const styles = StyleSheet.create({
         height: 220,
         borderRadius: 16,
         backgroundColor: COLORS.white,
-    },
-    qrPlaceholder: {
-        width: 160,
-        height: 160,
-        borderRadius: 16,
-        backgroundColor: COLORS.white,
-        justifyContent: 'center',
-        alignItems: 'center',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.1,
-        shadowRadius: 12,
-        elevation: 4,
     },
     qrHint: {
         fontSize: 13,
