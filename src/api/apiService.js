@@ -409,6 +409,15 @@ export const updateServiceCharge = async (percent) => {
     return response.data;
 };
 
+export const registerPushToken = async (pushToken, platform) => {
+    const response = await apiClient.post('/api/v1/mobile/devices/register/', {
+        push_token: pushToken,
+        platform: platform,
+        app_version: '1.4.0',
+    });
+    return response.data;
+};
+
 export const uploadPhoto = async (photoUri) => {
     const formData = new FormData();
     const filename = photoUri.split('/').pop();
