@@ -7,11 +7,12 @@ import {
     SafeAreaView,
     ScrollView,
     ActivityIndicator,
+    Alert,
     RefreshControl,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
-import { getOrders } from '../../api/apiService';
+import { getOrders, acceptOrder, startCooking, markReady, deliverOrder } from '../../api/apiService';
 
 const COLORS = {
     primary: '#ff6b6b',
@@ -77,6 +78,33 @@ export default function OrderModifyScreen({ route, navigation }) {
         if (diff < 1) return 'Только что';
         if (diff < 60) return `${diff} мин назад`;
         return `${Math.floor(diff / 60)} ч назад`;
+    };
+
+    const updateOrderStatus = async (orderId, action) => {
+        try {
+            if (action === 'accept') await acceptOrder(orderId);
+            else if (action === 'cooking') await startCooking(orderId);
+            else if (action === 'ready') await markReady(orderId);
+            else if (action === 'deliver') await deliverOrder(orderId);
+            await fetchOrders();
+        } catch (e) {
+            Alert.alert('Ошибка', 'Не удалось обновить статус');
+        }
+    };
+
+    const statusActions = (status) => {
+        switch (status) {
+            case 'CREATED':
+                return [{ key: 'accept', label: 'Принять', icon: 'check', color: COLORS.primary }];
+            case 'ACCEPTED':
+                return [{ key: 'cooking', label: 'Готовится', icon: 'restaurant', color: COLORS.warning }];
+            case 'COOKING':
+                return [{ key: 'ready', label: 'Готов', icon: 'done', color: COLORS.success }];
+            case 'READY':
+                return [{ key: 'deliver', label: 'Доставлено', icon: 'local-shipping', color: COLORS.primary }];
+            default:
+                return [];
+        }
     };
 
     return (
@@ -151,6 +179,21 @@ export default function OrderModifyScreen({ route, navigation }) {
                                     <Text style={styles.totalAmount}>{formatCurrency(order.total_amount)}</Text>
                                 </View>
                             ) : null}
+
+                            {statusActions(order.status).length > 0 && (
+                                <View style={styles.actionRow}>
+                                    {statusActions(order.status).map((action) => (
+                                        <TouchableOpacity
+                                            key={action.key}
+                                            style={[styles.actionBtn, { backgroundColor: action.color }]}
+                                            onPress={() => updateOrderStatus(order.id, action.key)}
+                                        >
+                                            <MaterialIcons name={action.icon} size={18} color={COLORS.white} />
+                                            <Text style={styles.actionBtnText}>{action.label}</Text>
+                                        </TouchableOpacity>
+                                    ))}
+                                </View>
+                            )}
                         </View>
                     ))}
                 </ScrollView>
@@ -307,5 +350,27 @@ const styles = StyleSheet.create({
         fontSize: 18,
         fontWeight: '800',
         color: COLORS.primary,
+    },
+    actionRow: {
+        flexDirection: 'row',
+        gap: 10,
+        marginTop: 14,
+        paddingTop: 12,
+        borderTopWidth: 1,
+        borderTopColor: COLORS.slate100,
+    },
+    actionBtn: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 6,
+        paddingVertical: 12,
+        borderRadius: 12,
+    },
+    actionBtnText: {
+        color: COLORS.white,
+        fontSize: 14,
+        fontWeight: '700',
     },
 });
