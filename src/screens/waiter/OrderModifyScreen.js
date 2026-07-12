@@ -9,10 +9,12 @@ import {
     ActivityIndicator,
     Alert,
     RefreshControl,
+    Modal,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { getOrders, acceptOrder, startCooking, markReady, deliverOrder } from '../../api/apiService';
+import apiClient from '../../api/apiClient';
 
 const COLORS = {
     primary: '#ff6b6b',
@@ -44,28 +46,109 @@ const STATUS_COLORS = {
     CANCELLED: COLORS.danger,
 };
 
+function BillModal({ visible, onClose, order, serviceChargePercent }) {
+    if (!order) return null;
+
+    const subtotal = (order.items || []).reduce((sum, item) => sum + (parseFloat(item.price) || 0) * (item.quantity || 1), 0);
+    const serviceChargeAmount = Math.round(subtotal * serviceChargePercent / 100);
+    const grandTotal = subtotal + serviceChargeAmount;
+
+    const formatCurrency = (val) => {
+        const num = typeof val === 'string' ? parseFloat(val) : (val || 0);
+        return Math.round(num).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ') + ' сум';
+    };
+
+    return (
+        <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+            <View style={styles.modalOverlay}>
+                <View style={styles.modalContent}>
+                    <View style={styles.modalHeader}>
+                        <Text style={styles.modalTitle}>Счёт</Text>
+                        <TouchableOpacity onPress={onClose}>
+                            <MaterialIcons name="close" size={24} color={COLORS.textDark} />
+                        </TouchableOpacity>
+                    </View>
+
+                    <ScrollView style={styles.billScroll} showsVerticalScrollIndicator={false}>
+                        <Text style={styles.billTableInfo}>Стол {order.table_number}</Text>
+
+                        <View style={styles.billDivider} />
+
+                        {(order.items || []).map((item, idx) => (
+                            <View key={item.id || idx} style={styles.billItemRow}>
+                                <View style={styles.billItemLeft}>
+                                    <Text style={styles.billItemQty}>{item.quantity}×</Text>
+                                    <View style={styles.billItemInfo}>
+                                        <Text style={styles.billItemName}>{item.dish_name || 'Блюдо'}</Text>
+                                        {item.notes ? (
+                                            <Text style={styles.billItemNotes}>{item.notes}</Text>
+                                        ) : null}
+                                    </View>
+                                </View>
+                                <Text style={styles.billItemPrice}>{formatCurrency((parseFloat(item.price) || 0) * (item.quantity || 1))}</Text>
+                            </View>
+                        ))}
+
+                        <View style={styles.billDivider} />
+
+                        <View style={styles.billTotalRow}>
+                            <Text style={styles.billTotalLabel}>Подытог</Text>
+                            <Text style={styles.billTotalValue}>{formatCurrency(subtotal)}</Text>
+                        </View>
+
+                        {serviceChargePercent > 0 && (
+                            <View style={styles.billTotalRow}>
+                                <Text style={styles.billTotalLabel}>Сервисный сбор ({serviceChargePercent}%)</Text>
+                                <Text style={styles.billTotalValue}>{formatCurrency(serviceChargeAmount)}</Text>
+                            </View>
+                        )}
+
+                        <View style={styles.billGrandRow}>
+                            <Text style={styles.billGrandLabel}>Итого</Text>
+                            <Text style={styles.billGrandValue}>{formatCurrency(grandTotal)}</Text>
+                        </View>
+
+                        <TouchableOpacity style={styles.billCloseBtn} onPress={onClose}>
+                            <Text style={styles.billCloseBtnText}>Закрыть</Text>
+                        </TouchableOpacity>
+                    </ScrollView>
+                </View>
+            </View>
+        </Modal>
+    );
+}
+
 export default function OrderModifyScreen({ route, navigation }) {
     const { tableNumber, tableId } = route.params;
     const [orders, setOrders] = useState([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
+    const [serviceChargePercent, setServiceChargePercent] = useState(10);
+    const [billOrder, setBillOrder] = useState(null);
 
-    const fetchOrders = useCallback(async () => {
+    const fetchData = useCallback(async () => {
         try {
-            const data = await getOrders({ table: tableId });
-            const list = data.results || data || [];
+            const [ordersData, homeData] = await Promise.all([
+                getOrders({ table: tableId }),
+                apiClient.get('/api/v1/mobile/home/').catch(() => null),
+            ]);
+            const list = ordersData.results || ordersData || [];
             setOrders(Array.isArray(list) ? list.filter(o =>
-                ['CREATED', 'ACCEPTED', 'COOKING', 'READY'].includes(o.status)
+                ['CREATED', 'ACCEPTED', 'COOKING', 'READY', 'DELIVERED'].includes(o.status)
             ) : []);
+
+            if (homeData?.data?.restaurant?.service_charge_percent) {
+                setServiceChargePercent(parseFloat(homeData.data.restaurant.service_charge_percent));
+            }
         } catch (e) {
-            console.log('Failed to load orders:', e.message);
+            console.log('Failed to load data:', e.message);
         } finally {
             setLoading(false);
             setRefreshing(false);
         }
     }, [tableId]);
 
-    useFocusEffect(useCallback(() => { fetchOrders(); }, [fetchOrders]));
+    useFocusEffect(useCallback(() => { fetchData(); }, [fetchData]));
 
     const formatCurrency = (val) => {
         const num = typeof val === 'string' ? parseFloat(val) : (val || 0);
@@ -86,7 +169,7 @@ export default function OrderModifyScreen({ route, navigation }) {
             else if (action === 'cooking') await startCooking(orderId);
             else if (action === 'ready') await markReady(orderId);
             else if (action === 'deliver') await deliverOrder(orderId);
-            await fetchOrders();
+            await fetchData();
         } catch (e) {
             Alert.alert('Ошибка', 'Не удалось обновить статус');
         }
@@ -106,6 +189,8 @@ export default function OrderModifyScreen({ route, navigation }) {
                 return [];
         }
     };
+
+    const canShowBill = (status) => ['READY', 'DELIVERED'].includes(status);
 
     return (
         <SafeAreaView style={styles.container}>
@@ -127,7 +212,7 @@ export default function OrderModifyScreen({ route, navigation }) {
             ) : orders.length === 0 ? (
                 <View style={styles.center}>
                     <MaterialIcons name="receipt-long" size={48} color={COLORS.textMuted} />
-                    <Text style={styles.emptyText}>Нет активных заказов</Text>
+                    <Text style={styles.emptyText}>Нет заказов</Text>
                     <TouchableOpacity
                         style={styles.emptyAddBtn}
                         onPress={() => navigation.navigate('OrderCreation', { tableNumber, tableId })}
@@ -140,7 +225,7 @@ export default function OrderModifyScreen({ route, navigation }) {
                     style={styles.scroll}
                     contentContainerStyle={styles.scrollContent}
                     refreshControl={
-                        <RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchOrders(); }} tintColor={COLORS.primary} />
+                        <RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchData(); }} tintColor={COLORS.primary} />
                     }
                     showsVerticalScrollIndicator={false}
                 >
@@ -180,24 +265,38 @@ export default function OrderModifyScreen({ route, navigation }) {
                                 </View>
                             ) : null}
 
-                            {statusActions(order.status).length > 0 && (
-                                <View style={styles.actionRow}>
-                                    {statusActions(order.status).map((action) => (
-                                        <TouchableOpacity
-                                            key={action.key}
-                                            style={[styles.actionBtn, { backgroundColor: action.color }]}
-                                            onPress={() => updateOrderStatus(order.id, action.key)}
-                                        >
-                                            <MaterialIcons name={action.icon} size={18} color={COLORS.white} />
-                                            <Text style={styles.actionBtnText}>{action.label}</Text>
-                                        </TouchableOpacity>
-                                    ))}
-                                </View>
-                            )}
+                            <View style={styles.actionRow}>
+                                {statusActions(order.status).map((action) => (
+                                    <TouchableOpacity
+                                        key={action.key}
+                                        style={[styles.actionBtn, { backgroundColor: action.color }]}
+                                        onPress={() => updateOrderStatus(order.id, action.key)}
+                                    >
+                                        <MaterialIcons name={action.icon} size={18} color={COLORS.white} />
+                                        <Text style={styles.actionBtnText}>{action.label}</Text>
+                                    </TouchableOpacity>
+                                ))}
+                                {canShowBill(order.status) && (
+                                    <TouchableOpacity
+                                        style={[styles.actionBtn, { backgroundColor: COLORS.textDark }]}
+                                        onPress={() => setBillOrder(order)}
+                                    >
+                                        <MaterialIcons name="receipt" size={18} color={COLORS.white} />
+                                        <Text style={styles.actionBtnText}>Счёт</Text>
+                                    </TouchableOpacity>
+                                )}
+                            </View>
                         </View>
                     ))}
                 </ScrollView>
             )}
+
+            <BillModal
+                visible={!!billOrder}
+                onClose={() => setBillOrder(null)}
+                order={billOrder}
+                serviceChargePercent={serviceChargePercent}
+            />
         </SafeAreaView>
     );
 }
@@ -371,6 +470,129 @@ const styles = StyleSheet.create({
     actionBtnText: {
         color: COLORS.white,
         fontSize: 14,
+        fontWeight: '700',
+    },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        justifyContent: 'flex-end',
+    },
+    modalContent: {
+        backgroundColor: COLORS.backgroundLight,
+        borderTopLeftRadius: 24,
+        borderTopRightRadius: 24,
+        maxHeight: '85%',
+        paddingTop: 8,
+    },
+    modalHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingHorizontal: 20,
+        paddingVertical: 16,
+        borderBottomWidth: 1,
+        borderBottomColor: COLORS.slate100,
+    },
+    modalTitle: {
+        fontSize: 20,
+        fontWeight: '800',
+        color: COLORS.textDark,
+    },
+    billScroll: {
+        paddingHorizontal: 20,
+        paddingTop: 16,
+    },
+    billTableInfo: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: COLORS.textMuted,
+        marginBottom: 8,
+    },
+    billDivider: {
+        height: 1,
+        backgroundColor: COLORS.slate100,
+        marginVertical: 12,
+    },
+    billItemRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'flex-start',
+        paddingVertical: 6,
+    },
+    billItemLeft: {
+        flexDirection: 'row',
+        flex: 1,
+        gap: 8,
+    },
+    billItemQty: {
+        fontSize: 14,
+        fontWeight: '700',
+        color: COLORS.textMuted,
+        minWidth: 24,
+    },
+    billItemInfo: {
+        flex: 1,
+    },
+    billItemName: {
+        fontSize: 15,
+        fontWeight: '600',
+        color: COLORS.textDark,
+    },
+    billItemNotes: {
+        fontSize: 12,
+        color: COLORS.textMuted,
+        fontStyle: 'italic',
+        marginTop: 2,
+    },
+    billItemPrice: {
+        fontSize: 14,
+        fontWeight: '700',
+        color: COLORS.textDark,
+    },
+    billTotalRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingVertical: 8,
+    },
+    billTotalLabel: {
+        fontSize: 14,
+        color: COLORS.textMuted,
+    },
+    billTotalValue: {
+        fontSize: 14,
+        fontWeight: '700',
+        color: COLORS.textDark,
+    },
+    billGrandRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingVertical: 12,
+        marginTop: 4,
+        borderTopWidth: 2,
+        borderTopColor: COLORS.textDark,
+    },
+    billGrandLabel: {
+        fontSize: 18,
+        fontWeight: '800',
+        color: COLORS.textDark,
+    },
+    billGrandValue: {
+        fontSize: 22,
+        fontWeight: '900',
+        color: COLORS.primary,
+    },
+    billCloseBtn: {
+        backgroundColor: COLORS.primary,
+        borderRadius: 14,
+        paddingVertical: 14,
+        alignItems: 'center',
+        marginVertical: 20,
+    },
+    billCloseBtnText: {
+        color: COLORS.white,
+        fontSize: 16,
         fontWeight: '700',
     },
 });
