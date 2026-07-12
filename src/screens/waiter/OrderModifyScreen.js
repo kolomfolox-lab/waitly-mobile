@@ -90,14 +90,21 @@ function BillModal({ visible, onClose, tableNumber, billData }) {
                             <Text style={styles.billGrandValue}>{formatCurrency(grandTotal)}</Text>
                         </View>
 
-                        {billData.payment_url ? (
-                            <View style={styles.qrSection}>
-                                <Image
-                                    source={{ uri: `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(billData.payment_url)}` }}
-                                    style={styles.qrImage}
-                                />
-                                <Text style={styles.qrHint}>Гость сканирует QR для оплаты</Text>
-                            </View>
+                        {billData.payment_method === 'qr' ? (
+                            billData.payment_url ? (
+                                <View style={styles.qrSection}>
+                                    <Image
+                                        source={{ uri: `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(billData.payment_url)}` }}
+                                        style={styles.qrImage}
+                                    />
+                                    <Text style={styles.qrHint}>Гость сканирует QR для оплаты</Text>
+                                </View>
+                            ) : (
+                                <View style={styles.cashSection}>
+                                    <MaterialIcons name="error-outline" size={48} color={COLORS.warning} />
+                                    <Text style={styles.cashHint}>Платёжная система не настроена</Text>
+                                </View>
+                            )
                         ) : (
                             <View style={styles.cashSection}>
                                 <MaterialIcons name="payments" size={48} color={COLORS.success} />
@@ -205,6 +212,7 @@ export default function OrderModifyScreen({ route, navigation }) {
                 visible: true,
                 data: {
                     items: newItems,
+                    payment_method: paymentMethod,
                     payment_url: bill.payment_url || null,
                     service_charge_percent: percent,
                 },
