@@ -21,6 +21,7 @@ import UnauthorizedRoleScreen from '../screens/common/UnauthorizedRoleScreen';
 // Waiter
 import WaiterDashboard from '../screens/waiter/WaiterDashboard';
 import WaiterTables from '../screens/waiter/WaiterTables';
+import WaiterTipsScreen from '../screens/waiter/WaiterTipsScreen';
 import OrdersListScreen from '../screens/waiter/OrdersListScreen';
 import OrderCreationScreen from '../screens/waiter/OrderCreationScreen';
 import OrderConfirmationScreen from '../screens/waiter/OrderConfirmationScreen';
@@ -288,12 +289,14 @@ function WaiterTabs() {
                 HomeTab: 'home',
                 TablesTab: 'table-restaurant',
                 OrdersTab: 'receipt-long',
+                TipsTab: 'monetization-on',
                 ProfileTab: 'person',
             })}
         >
             <Tab.Screen name="HomeTab" component={WaiterDashboardStack} options={{ tabBarLabel: t('tab_home') }} />
             <Tab.Screen name="TablesTab" component={WaiterTablesStack} options={{ tabBarLabel: t('tab_tables') }} />
             <Tab.Screen name="OrdersTab" component={WaiterOrdersStack} options={{ tabBarLabel: t('tab_orders') }} />
+            <Tab.Screen name="TipsTab" component={WaiterTipsScreen} options={{ tabBarLabel: 'Чаевые' }} />
             <Tab.Screen
                 name="ProfileTab"
                 component={ProfileStack}

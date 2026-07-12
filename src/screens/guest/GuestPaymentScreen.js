@@ -39,11 +39,13 @@ export default function GuestPaymentScreen({ route, navigation }) {
     const [serviceChargePercent, setServiceChargePercent] = useState(0);
     const [tipAmount, setTipAmount] = useState('');
     const [savingsGoal, setSavingsGoal] = useState(null);
+    const [waiterGoal, setWaiterGoal] = useState(null);
     const [savingsContribute, setSavingsContribute] = useState('');
 
     useEffect(() => {
         getServiceCharge().then(r => setServiceChargePercent(r.percent || 0)).catch(() => {});
         getSavingsGoal().then(r => setSavingsGoal(r)).catch(() => {});
+        api.get('/api/v1/guest/waiter/goal/').then(r => setWaiterGoal(r.data?.goal || null)).catch(() => {});
     }, []);
 
     const serviceCharge = total ? Math.round(parseFloat(total) * serviceChargePercent / 100) : 0;
@@ -220,6 +222,29 @@ export default function GuestPaymentScreen({ route, navigation }) {
                             value={savingsContribute}
                             onChangeText={setSavingsContribute}
                         />
+                    </View>
+                )}
+
+                {waiterGoal && (
+                    <View style={styles.savingsSection}>
+                        <Text style={styles.sectionTitle}>Цель официанта: {waiterGoal.name}</Text>
+                        <View style={styles.savingsProgress}>
+                            <View style={styles.savingsProgressTrack}>
+                                <View style={[styles.savingsProgressFill, {
+                                    width: `${Math.min(100, parseFloat(waiterGoal.current_amount || 0) / parseFloat(waiterGoal.target_amount || 1) * 100)}%`,
+                                    backgroundColor: '#f59e0b',
+                                }]} />
+                            </View>
+                            <Text style={styles.savingsProgressText}>
+                                {Math.min(100, Math.round(parseFloat(waiterGoal.current_amount || 0) / parseFloat(waiterGoal.target_amount || 1) * 100))}%
+                            </Text>
+                        </View>
+                        <Text style={styles.savingsLabel}>
+                            {parseFloat(waiterGoal.current_amount || 0).toLocaleString()} / {parseFloat(waiterGoal.target_amount || 0).toLocaleString()} UZS
+                        </Text>
+                        <Text style={styles.waiterGoalHint}>
+                            Чаевые идут в копилку официанта
+                        </Text>
                     </View>
                 )}
 
@@ -506,5 +531,12 @@ const styles = StyleSheet.create({
         fontSize: 13,
         color: COLORS.textMuted,
         fontWeight: '500',
+    },
+    waiterGoalHint: {
+        fontSize: 12,
+        color: '#f59e0b',
+        fontWeight: '500',
+        marginTop: 8,
+        textAlign: 'center',
     },
 });
