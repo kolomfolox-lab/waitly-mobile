@@ -12,11 +12,14 @@ import {
     Platform,
     ScrollView,
     Animated,
+    Image,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { validateInvite } from '../../api/apiService';
+import * as ImagePicker from 'expo-image-picker';
+import { validateInvite, uploadPhoto } from '../../api/apiService';
 import { useAuth } from '../../context/AuthContext';
+import InitialsAvatar from '../../components/InitialsAvatar';
 
 const COLORS = {
     primary: '#ff6b6b',
@@ -31,17 +34,6 @@ const COLORS = {
 };
 
 const STEPS = ['Код', 'Имя', 'Телефон', 'Пароль'];
-
-const AVATARS = [
-    { icon: 'face', color: '#ff6b6b' },
-    { icon: 'emoji-emotions', color: '#f59e0b' },
-    { icon: 'pets', color: '#22c55e' },
-    { icon: 'star', color: '#3b82f6' },
-    { icon: 'favorite', color: '#ec4899' },
-    { icon: 'music-note', color: '#8b5cf6' },
-    { icon: 'palette', color: '#14b8a6' },
-    { icon: 'bolt', color: '#f97316' },
-];
 
 function getPasswordScore(pw) {
     let score = 0;
@@ -75,7 +67,7 @@ export default function RegisterScreen({ navigation }) {
 
     const [fullName, setFullName] = useState('');
     const [phone, setPhone] = useState('');
-    const [selectedAvatar, setSelectedAvatar] = useState(0);
+    const [photoUri, setPhotoUri] = useState(null);
     const [password, setPassword] = useState('');
     const [passwordConfirm, setPasswordConfirm] = useState('');
 
@@ -136,6 +128,47 @@ export default function RegisterScreen({ navigation }) {
         handleRegister();
     };
 
+    const pickPhoto = async () => {
+        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (status !== 'granted') {
+            Alert.alert('Доступ запрещён', 'Разрешите доступ к галерее в настройках');
+            return;
+        }
+        const result = await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: ImagePicker.MediaTypeOptions.Images,
+            allowsEditing: true,
+            aspect: [1, 1],
+            quality: 0.6,
+        });
+        if (!result.canceled && result.assets?.length) {
+            setPhotoUri(result.assets[0].uri);
+        }
+    };
+
+    const takePhoto = async () => {
+        const { status } = await ImagePicker.requestCameraPermissionsAsync();
+        if (status !== 'granted') {
+            Alert.alert('Доступ запрещён', 'Разрешите доступ к камере в настройках');
+            return;
+        }
+        const result = await ImagePicker.launchCameraAsync({
+            allowsEditing: true,
+            aspect: [1, 1],
+            quality: 0.6,
+        });
+        if (!result.canceled && result.assets?.length) {
+            setPhotoUri(result.assets[0].uri);
+        }
+    };
+
+    const showPhotoPicker = () => {
+        Alert.alert('Фото профиля', 'Выберите источник', [
+            { text: 'Камера', onPress: takePhoto },
+            { text: 'Галерея', onPress: pickPhoto },
+            { text: 'Отмена', style: 'cancel' },
+        ]);
+    };
+
     const handleRegister = async () => {
         setLoading(true);
         try {
@@ -145,6 +178,13 @@ export default function RegisterScreen({ navigation }) {
                 password,
                 full_name: fullName.trim(),
             });
+            if (photoUri) {
+                try {
+                    await uploadPhoto(photoUri);
+                } catch (e) {
+                    // photo upload failed — not critical
+                }
+            }
         } catch (e) {
             const data = e?.response?.data;
             const msg = data?.error?.message || data?.detail || data?.message || Object.values(data || {}).flat().join(', ') || 'Ошибка регистрации';
@@ -224,32 +264,30 @@ export default function RegisterScreen({ navigation }) {
             <Text style={styles.stepTitle}>Ваше имя</Text>
             <Text style={styles.stepDesc}>Как к вам обращаться?</Text>
 
-            <View style={styles.inputBox}>
-                <MaterialIcons name="person" size={20} color={COLORS.textMuted} />
-                <TextInput
-                    style={styles.input}
-                    placeholder="Иван Иванов"
-                    placeholderTextColor={COLORS.textMuted}
-                    value={fullName}
-                    onChangeText={setFullName}
-                    autoFocus
-                />
-            </View>
-
-            {/* Аватар */}
-            <Text style={styles.sectionLabel}>Выберите аватар</Text>
-            <View style={styles.avatarGrid}>
-                {AVATARS.map((a, i) => (
-                    <TouchableOpacity
-                        key={i}
-                        style={[styles.avatarItem, selectedAvatar === i && styles.avatarItemActive]}
-                        onPress={() => setSelectedAvatar(i)}
-                    >
-                        <View style={[styles.avatarIcon, { backgroundColor: a.color + '20' }]}>
-                            <MaterialIcons name={a.icon} size={22} color={a.color} />
-                        </View>
-                    </TouchableOpacity>
-                ))}
+            <View style={styles.avatarPickerRow}>
+                <TouchableOpacity onPress={showPhotoPicker} style={styles.avatarPickerBtn}>
+                    {photoUri ? (
+                        <Image source={{ uri: photoUri }} style={styles.avatarPreview} />
+                    ) : (
+                        <InitialsAvatar name={fullName || '?'} size={72} />
+                    )}
+                    <View style={styles.avatarBadge}>
+                        <MaterialIcons name="camera-alt" size={14} color={COLORS.white} />
+                    </View>
+                </TouchableOpacity>
+                <View style={{ flex: 1 }}>
+                    <View style={styles.inputBox}>
+                        <MaterialIcons name="person" size={20} color={COLORS.textMuted} />
+                        <TextInput
+                            style={styles.input}
+                            placeholder="Иван Иванов"
+                            placeholderTextColor={COLORS.textMuted}
+                            value={fullName}
+                            onChangeText={setFullName}
+                            autoFocus
+                        />
+                    </View>
+                </View>
             </View>
 
             <TouchableOpacity
@@ -549,36 +587,32 @@ const styles = StyleSheet.create({
     },
 
     /* ── аватар ── */
-    sectionLabel: {
-        fontSize: 14,
-        fontWeight: '600',
-        color: COLORS.text,
-        marginBottom: -8,
-    },
-    avatarGrid: {
+    avatarPickerRow: {
         flexDirection: 'row',
-        flexWrap: 'wrap',
-        gap: 12,
+        alignItems: 'center',
+        gap: 16,
     },
-    avatarItem: {
-        width: 48,
-        height: 48,
-        borderRadius: 24,
-        backgroundColor: COLORS.white,
+    avatarPickerBtn: {
+        position: 'relative',
+    },
+    avatarPreview: {
+        width: 72,
+        height: 72,
+        borderRadius: 36,
+        resizeMode: 'cover',
+    },
+    avatarBadge: {
+        position: 'absolute',
+        bottom: 0,
+        right: 0,
+        width: 24,
+        height: 24,
+        borderRadius: 12,
+        backgroundColor: COLORS.primary,
         justifyContent: 'center',
         alignItems: 'center',
         borderWidth: 2,
-        borderColor: 'transparent',
-    },
-    avatarItemActive: {
-        borderColor: COLORS.primary,
-    },
-    avatarIcon: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        justifyContent: 'center',
-        alignItems: 'center',
+        borderColor: COLORS.white,
     },
 
     /* ── сила пароля ── */

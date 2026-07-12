@@ -398,3 +398,18 @@ export const updateServiceCharge = async (percent) => {
     const response = await apiClient.put('/api/v1/owner/restaurants/service-charge/', { percent });
     return response.data;
 };
+
+export const uploadPhoto = async (photoUri) => {
+    const formData = new FormData();
+    const filename = photoUri.split('/').pop();
+    const ext = filename.split('.').pop();
+    formData.append('photo', {
+        uri: photoUri,
+        name: filename,
+        type: `image/${ext === 'png' ? 'png' : 'jpeg'}`,
+    });
+    const response = await apiClient.post('/api/v1/auth/upload-photo/', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data;
+};

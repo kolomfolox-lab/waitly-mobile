@@ -210,6 +210,7 @@ export default function WaiterDashboard({ navigation }) {
                     >
                         <UserAvatar
                             fullName={user?.full_name}
+                            photoUrl={user?.photo_url}
                             avatarPresetId={avatarPresetId}
                             size={44}
                             fallbackBackgroundColor={COLORS.primary}

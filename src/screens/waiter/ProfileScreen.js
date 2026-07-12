@@ -144,6 +144,7 @@ export default function ProfileScreen({ navigation }) {
                         <View style={styles.avatarCircle}>
                             <UserAvatar
                                 fullName={displayUser.full_name}
+                                photoUrl={displayUser.photo_url}
                                 avatarPresetId={avatarPresetId}
                                 size={88}
                                 fallbackBackgroundColor={COLORS.primary}

@@ -1,16 +1,41 @@
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View, Image } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { getAvatarPresetById, getUserInitials } from '../../utils/avatar';
+
+const COLORS = [
+    '#ff6b6b', '#f59e0b', '#22c55e', '#3b82f6',
+    '#ec4899', '#8b5cf6', '#14b8a6', '#f97316',
+    '#e11d48', '#d946ef', '#6366f1', '#06b6d4',
+];
+
+function getColor(name) {
+    if (!name) return COLORS[0];
+    let hash = 0;
+    for (let i = 0; i < name.length; i++) {
+        hash = name.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    return COLORS[Math.abs(hash) % COLORS.length];
+}
 
 export default function UserAvatar({
     fullName,
     avatarPresetId,
+    photoUrl,
     size = 44,
-    fallbackBackgroundColor = '#ff6b6b',
+    fallbackBackgroundColor,
     fallbackTextColor = '#ffffff',
 }) {
-    const preset = getAvatarPresetById(avatarPresetId);
+    if (photoUrl) {
+        return (
+            <Image
+                source={{ uri: photoUrl }}
+                style={[styles.avatar, { width: size, height: size, borderRadius: size / 2 }]}
+            />
+        );
+    }
+
+    const preset = avatarPresetId ? getAvatarPresetById(avatarPresetId) : null;
 
     if (preset) {
         return (
@@ -34,6 +59,8 @@ export default function UserAvatar({
         );
     }
 
+    const bgColor = fallbackBackgroundColor || getColor(fullName);
+
     return (
         <View
             style={[
@@ -42,7 +69,7 @@ export default function UserAvatar({
                     width: size,
                     height: size,
                     borderRadius: size / 2,
-                    backgroundColor: fallbackBackgroundColor,
+                    backgroundColor: bgColor,
                 },
             ]}
         >
