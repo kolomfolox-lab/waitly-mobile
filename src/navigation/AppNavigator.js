@@ -11,6 +11,9 @@ import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/AuthContext';
 import { KitchenProvider } from '../context/KitchenContext';
 import LoginScreen from '../screens/common/LoginScreen';
+import AuthScreen from '../screens/common/AuthScreen';
+import RegisterScreen from '../screens/common/RegisterScreen';
+import LoginTelegramScreen from '../screens/common/LoginTelegramScreen';
 import LinkPhoneScreen from '../screens/common/LinkPhoneScreen';
 import SubscriptionExpiredScreen from '../screens/common/SubscriptionExpiredScreen';
 import UnauthorizedRoleScreen from '../screens/common/UnauthorizedRoleScreen';
@@ -21,6 +24,7 @@ import WaiterTables from '../screens/waiter/WaiterTables';
 import OrdersListScreen from '../screens/waiter/OrdersListScreen';
 import OrderCreationScreen from '../screens/waiter/OrderCreationScreen';
 import OrderConfirmationScreen from '../screens/waiter/OrderConfirmationScreen';
+import OrderModifyScreen from '../screens/waiter/OrderModifyScreen';
 import ProfileScreen from '../screens/waiter/ProfileScreen';
 import NotificationsScreen from '../screens/waiter/NotificationsScreen';
 import LanguageScreen from '../screens/waiter/LanguageScreen';
@@ -88,6 +92,7 @@ import GuestCartScreen from '../screens/guest/GuestCartScreen';
 import GuestOrderTrackingScreen from '../screens/guest/GuestOrderTrackingScreen';
 import GuestPaymentScreen from '../screens/guest/GuestPaymentScreen';
 import GuestProfileScreen from '../screens/guest/GuestProfileScreen';
+import GuestSavingsGoalScreen from '../screens/guest/GuestSavingsGoalScreen';
 
 // Guest Cart
 import { CartProvider } from '../context/CartContext';
@@ -188,6 +193,7 @@ function WaiterDashboardStack() {
         <Stack.Navigator screenOptions={{ headerShown: false }}>
             <Stack.Screen name="DashboardHome" component={WaiterDashboard} />
             <Stack.Screen name="OrderCreation" component={OrderCreationScreen} />
+            <Stack.Screen name="OrderModify" component={OrderModifyScreen} />
             <Stack.Screen name="OrderConfirmation" component={OrderConfirmationScreen} options={{ gestureEnabled: false }} />
         </Stack.Navigator>
     );
@@ -198,6 +204,7 @@ function WaiterTablesStack() {
         <Stack.Navigator screenOptions={{ headerShown: false }}>
             <Stack.Screen name="TablesHome" component={WaiterTables} />
             <Stack.Screen name="OrderCreation" component={OrderCreationScreen} />
+            <Stack.Screen name="OrderModify" component={OrderModifyScreen} />
             <Stack.Screen name="OrderConfirmation" component={OrderConfirmationScreen} options={{ gestureEnabled: false }} />
         </Stack.Navigator>
     );
@@ -531,6 +538,15 @@ function GuestOrderStack() {
     );
 }
 
+function GuestProfileStack() {
+    return (
+        <Stack.Navigator screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="GuestProfileHome" component={GuestProfileScreen} />
+            <Stack.Screen name="GuestSavingsGoal" component={GuestSavingsGoalScreen} />
+        </Stack.Navigator>
+    );
+}
+
 function GuestTabsInner() {
     const { t } = useTranslation();
     return (
@@ -547,7 +563,7 @@ function GuestTabsInner() {
             <Tab.Screen name="MenuTab" component={GuestMenuStack} options={{ tabBarLabel: 'Меню' }} />
             <Tab.Screen name="CartTab" component={GuestCartStack} options={{ tabBarLabel: 'Корзина' }} />
             <Tab.Screen name="OrdersTab" component={GuestOrderStack} options={{ tabBarLabel: 'Заказ' }} />
-            <Tab.Screen name="ProfileTab" component={GuestProfileScreen} options={{ tabBarLabel: 'Профиль' }} />
+            <Tab.Screen name="ProfileTab" component={GuestProfileStack} options={{ tabBarLabel: 'Профиль' }} />
         </Tab.Navigator>
     );
 }
@@ -624,6 +640,9 @@ export default function AppNavigator() {
                 {!user ? (
                     <>
                         <Stack.Screen name="Login" component={LoginScreen} />
+                        <Stack.Screen name="Auth" component={AuthScreen} />
+                        <Stack.Screen name="Register" component={RegisterScreen} />
+                        <Stack.Screen name="LoginTelegram" component={LoginTelegramScreen} />
                         <Stack.Screen name="LinkPhone" component={LinkPhoneScreen} />
                     </>
                 ) : subscriptionLock.blocked && !allowKitchenReadOnly ? (

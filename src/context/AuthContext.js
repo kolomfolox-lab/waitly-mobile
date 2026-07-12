@@ -1,6 +1,6 @@
 import React, { createContext, useState, useEffect, useContext } from 'react';
 import Storage from '../utils/storage';
-import { authLogin, getMe } from '../api/apiService';
+import { authLogin, authRegister, getMe } from '../api/apiService';
 import { telegramLogin, telegramLinkPhone } from '../api/telegramAuth';
 
 const AuthContext = createContext();
@@ -141,6 +141,26 @@ export const AuthProvider = ({ children }) => {
         return userData;
     };
 
+    const register = async ({ invite_code, phone_number, password, full_name }) => {
+        try {
+            const response = await authRegister({ invite_code, phone_number, password, full_name });
+
+            if (response.access) {
+                await Storage.setItem('auth_access_token', response.access);
+            }
+            if (response.refresh) {
+                await Storage.setItem('auth_refresh_token', response.refresh);
+            }
+
+            if (response.user) {
+                await applyUserData(response.user);
+            }
+            return true;
+        } catch (error) {
+            throw error;
+        }
+    };
+
     const logout = async () => {
         await clearStorage();
         setUser(null);
@@ -163,7 +183,7 @@ export const AuthProvider = ({ children }) => {
     };
 
     return (
-        <AuthContext.Provider value={{ user, role, loading, login, logout, telegramAuth, telegramLink, refreshUser, subscriptionLock }}>
+        <AuthContext.Provider value={{ user, role, loading, login, register, logout, telegramAuth, telegramLink, refreshUser, subscriptionLock }}>
             {children}
         </AuthContext.Provider>
     );

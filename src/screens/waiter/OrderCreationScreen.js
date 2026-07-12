@@ -11,6 +11,10 @@ import {
     Image,
     Alert,
     ActivityIndicator,
+    TextInput,
+    Modal,
+    KeyboardAvoidingView,
+    Platform,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { getCategories, getDishes, createOrder } from '../../api/apiService';
@@ -72,6 +76,8 @@ export default function OrderCreationScreen({ route, navigation }) {
     const [submitting, setSubmitting] = useState(false);
     const [loading, setLoading] = useState(true);
     const [menuError, setMenuError] = useState('');
+    const [showCartModal, setShowCartModal] = useState(false);
+    const [editingNotes, setEditingNotes] = useState({});
 
     const fadeAnim = useRef(new Animated.Value(0)).current;
 
@@ -125,6 +131,7 @@ export default function OrderCreationScreen({ route, navigation }) {
                 quantity: (prev[key]?.quantity || 0) + 1,
                 seat_number: activeSeat,
                 guest_label: `Guest ${activeSeat}`,
+                notes: prev[key]?.notes || '',
             },
         }));
     };
@@ -185,6 +192,7 @@ export default function OrderCreationScreen({ route, navigation }) {
                 quantity: item.quantity,
                 seat_number: item.seat_number,
                 guest_label: item.guest_label,
+                notes: item.notes || '',
             }));
 
             const orderResponse = await createOrder(tableId, items);
@@ -394,7 +402,7 @@ export default function OrderCreationScreen({ route, navigation }) {
                         styles.cartBar,
                         (submitting || menuError || dishes.length === 0) && { opacity: 0.7 },
                     ]}
-                    onPress={handleSubmitOrder}
+                    onPress={() => setShowCartModal(true)}
                     disabled={submitting || Boolean(menuError) || dishes.length === 0}
                 >
                     <View style={styles.cartBarLeft}>
@@ -402,12 +410,101 @@ export default function OrderCreationScreen({ route, navigation }) {
                             <Text style={styles.cartBadgeText}>{getCartItemCount()}</Text>
                         </View>
                         <Text style={styles.cartBarTitle}>
-                            {submitting ? 'Оформление...' : 'Оформить заказ'}
+                            {submitting ? 'Оформление...' : 'Корзина'}
                         </Text>
                     </View>
                     <Text style={styles.cartBarPrice}>{formatCurrency(getCartTotal())}</Text>
                 </TouchableOpacity>
             )}
+
+            {/* Cart Modal */}
+            <Modal
+                visible={showCartModal}
+                animationType="slide"
+                transparent
+                onRequestClose={() => setShowCartModal(false)}
+            >
+                <KeyboardAvoidingView
+                    style={styles.modalOverlay}
+                    behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+                >
+                    <View style={styles.modalContent}>
+                        <View style={styles.modalHeader}>
+                            <Text style={styles.modalTitle}>Корзина — Стол {tableNumber}</Text>
+                            <TouchableOpacity onPress={() => setShowCartModal(false)}>
+                                <MaterialIcons name="close" size={24} color={COLORS.textDark} />
+                            </TouchableOpacity>
+                        </View>
+
+                        <ScrollView style={styles.modalScroll} showsVerticalScrollIndicator={false}>
+                            {Object.entries(cart).map(([key, item]) => {
+                                const dish = dishes.find(d => d.id === item.dishId);
+                                const subtotal = (parseFloat(dish?.price || 0) * item.quantity);
+                                return (
+                                    <View key={key} style={styles.modalItem}>
+                                        <View style={styles.modalItemRow}>
+                                            <View style={styles.modalItemInfo}>
+                                                <Text style={styles.modalItemName}>
+                                                    {item.guest_label && `${item.guest_label}: `}{dish?.name || 'Блюдо'}
+                                                </Text>
+                                                <Text style={styles.modalItemPrice}>
+                                                    {item.quantity} × {formatCurrency(parseFloat(dish?.price || 0))} = {formatCurrency(subtotal)}
+                                                </Text>
+                                            </View>
+                                            <View style={styles.modalQtyRow}>
+                                                <TouchableOpacity style={styles.qtyBtn} onPress={() => removeFromCart(item.dishId)}>
+                                                    <MaterialIcons name="remove" size={16} color={COLORS.primary} />
+                                                </TouchableOpacity>
+                                                <Text style={styles.modalQtyText}>{item.quantity}</Text>
+                                                <TouchableOpacity style={[styles.qtyBtn, styles.qtyBtnFilled]} onPress={() => addToCart(item.dishId)}>
+                                                    <MaterialIcons name="add" size={16} color={COLORS.white} />
+                                                </TouchableOpacity>
+                                            </View>
+                                        </View>
+
+                                        <View style={styles.notesRow}>
+                                            <MaterialIcons name="edit-note" size={18} color={COLORS.textMuted} />
+                                            <TextInput
+                                                style={styles.notesInput}
+                                                placeholder="Без лука, без соли..."
+                                                placeholderTextColor={COLORS.textMuted}
+                                                value={item.notes || ''}
+                                                onChangeText={(val) => {
+                                                    setCart(prev => ({
+                                                        ...prev,
+                                                        [key]: { ...prev[key], notes: val },
+                                                    }));
+                                                }}
+                                            />
+                                        </View>
+                                    </View>
+                                );
+                            })}
+                        </ScrollView>
+
+                        <View style={styles.modalFooter}>
+                            <View style={styles.modalTotalRow}>
+                                <Text style={styles.modalTotalLabel}>Итого</Text>
+                                <Text style={styles.modalTotalPrice}>{formatCurrency(getCartTotal())}</Text>
+                            </View>
+                            <TouchableOpacity
+                                style={[styles.modalSubmitBtn, submitting && { opacity: 0.6 }]}
+                                onPress={() => {
+                                    setShowCartModal(false);
+                                    setTimeout(() => handleSubmitOrder(), 300);
+                                }}
+                                disabled={submitting}
+                            >
+                                {submitting ? (
+                                    <ActivityIndicator color={COLORS.white} />
+                                ) : (
+                                    <Text style={styles.modalSubmitText}>Оформить заказ</Text>
+                                )}
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </KeyboardAvoidingView>
+            </Modal>
         </SafeAreaView>
     );
 }
@@ -694,5 +791,129 @@ const styles = StyleSheet.create({
         fontSize: 17,
         fontWeight: '800',
         color: COLORS.white,
+    },
+    modalOverlay: {
+        flex: 1,
+        justifyContent: 'flex-end',
+        backgroundColor: 'rgba(0,0,0,0.4)',
+    },
+    modalContent: {
+        backgroundColor: COLORS.backgroundLight,
+        borderTopLeftRadius: 24,
+        borderTopRightRadius: 24,
+        maxHeight: '85%',
+        paddingBottom: 30,
+    },
+    modalHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingHorizontal: 20,
+        paddingVertical: 16,
+        borderBottomWidth: 1,
+        borderBottomColor: COLORS.slate100,
+    },
+    modalTitle: {
+        fontSize: 18,
+        fontWeight: '800',
+        color: COLORS.textDark,
+    },
+    modalScroll: {
+        paddingHorizontal: 20,
+        paddingTop: 12,
+    },
+    modalItem: {
+        backgroundColor: COLORS.white,
+        borderRadius: 14,
+        padding: 14,
+        marginBottom: 10,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.03,
+        shadowRadius: 6,
+        elevation: 1,
+    },
+    modalItemRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+    },
+    modalItemInfo: {
+        flex: 1,
+    },
+    modalItemName: {
+        fontSize: 15,
+        fontWeight: '700',
+        color: COLORS.textDark,
+    },
+    modalItemPrice: {
+        fontSize: 13,
+        color: COLORS.textMuted,
+        marginTop: 2,
+    },
+    modalQtyRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+    },
+    modalQtyText: {
+        fontSize: 15,
+        fontWeight: '700',
+        color: COLORS.textDark,
+        minWidth: 18,
+        textAlign: 'center',
+    },
+    notesRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: COLORS.slate100,
+        borderRadius: 10,
+        paddingHorizontal: 10,
+        marginTop: 10,
+        gap: 6,
+    },
+    notesInput: {
+        flex: 1,
+        paddingVertical: 8,
+        fontSize: 13,
+        color: COLORS.textDark,
+    },
+    modalFooter: {
+        paddingHorizontal: 20,
+        paddingTop: 12,
+        borderTopWidth: 1,
+        borderTopColor: COLORS.slate100,
+        gap: 12,
+    },
+    modalTotalRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+    },
+    modalTotalLabel: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: COLORS.textMuted,
+    },
+    modalTotalPrice: {
+        fontSize: 20,
+        fontWeight: '800',
+        color: COLORS.primary,
+    },
+    modalSubmitBtn: {
+        backgroundColor: COLORS.primary,
+        borderRadius: 14,
+        paddingVertical: 16,
+        alignItems: 'center',
+        shadowColor: COLORS.primary,
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.3,
+        shadowRadius: 12,
+        elevation: 6,
+    },
+    modalSubmitText: {
+        color: COLORS.white,
+        fontSize: 17,
+        fontWeight: '700',
     },
 });

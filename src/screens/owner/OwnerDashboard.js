@@ -9,12 +9,15 @@ import {
     Animated,
     RefreshControl,
     Dimensions,
-    Image
+    Image,
+    TextInput,
+    Alert,
+    ActivityIndicator,
 } from 'react-native';
 import { MaterialIcons, Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../../context/AuthContext';
-import { getOwnerStats, getOwnerTodayOrders, getDishes, getOwnerStaff } from '../../api/apiService';
+import { getOwnerStats, getOwnerTodayOrders, getDishes, getOwnerStaff, getOwnerTipStats, getServiceCharge, updateServiceCharge } from '../../api/apiService';
 
 const COLORS = {
     primary: '#FF6B6B',
@@ -41,6 +44,10 @@ export default function OwnerDashboard({ navigation }) {
     const [dishes, setDishes] = useState([]);
     const [staff, setStaff] = useState([]);
     const [refreshing, setRefreshing] = useState(false);
+    const [ownerTipStats, setOwnerTipStats] = useState(null);
+    const [serviceCharge, setServiceCharge] = useState(0);
+    const [serviceChargeInput, setServiceChargeInput] = useState('');
+    const [savingCharge, setSavingCharge] = useState(false);
 
     const fadeAnim = useRef(new Animated.Value(0)).current;
 
@@ -50,17 +57,24 @@ export default function OwnerDashboard({ navigation }) {
 
     const fetchData = useCallback(async () => {
         try {
-            const [statsData, ordersData, dishesData, staffData] = await Promise.all([
+            const [statsData, ordersData, dishesData, staffData, tipData, scData] = await Promise.all([
                 getOwnerStats().catch(() => null),
                 getOwnerTodayOrders().catch(() => []),
                 getDishes().catch(() => []),
-                getOwnerStaff().catch(() => [])
+                getOwnerStaff().catch(() => []),
+                getOwnerTipStats().catch(() => null),
+                getServiceCharge().catch(() => null),
             ]);
 
             if (statsData) setStats(statsData);
             setTodayOrders(Array.isArray(ordersData) ? ordersData : (ordersData?.results || []));
             setDishes(Array.isArray(dishesData) ? dishesData : (dishesData?.results || []));
             setStaff(Array.isArray(staffData) ? staffData : (staffData?.results || []));
+            if (tipData) setOwnerTipStats(tipData);
+            if (scData) {
+                setServiceCharge(scData.percent || 0);
+                setServiceChargeInput(String(scData.percent || 0));
+            }
         } catch (e) {
             console.log('Owner stats failed:', e.message);
         }
@@ -171,6 +185,84 @@ export default function OwnerDashboard({ navigation }) {
                                 <Text style={styles.metricCurrency}>СУМ</Text>
                             </View>
                         </View>
+                    </View>
+
+                    {/* Tip Stats */}
+                    {ownerTipStats && (
+                        <>
+                            <View style={styles.sectionHeaderRow}>
+                                <Text style={styles.sectionTitleDark}>Чаевые</Text>
+                            </View>
+                            <View style={styles.tipStatsContainer}>
+                                <View style={styles.tipStatCard}>
+                                    <Text style={styles.tipStatValue}>{parseFloat(ownerTipStats.total_tips || '0').toLocaleString()}</Text>
+                                    <Text style={styles.tipStatLabel}>Всего чаевых (UZS)</Text>
+                                </View>
+                                <View style={styles.tipStatCard}>
+                                    <Text style={styles.tipStatValue}>{ownerTipStats.total_count || 0}</Text>
+                                    <Text style={styles.tipStatLabel}>Количество</Text>
+                                </View>
+                            </View>
+                            {(ownerTipStats.by_waiter || []).map((w, i) => (
+                                <View key={w.waiter_id || i} style={styles.listCard}>
+                                    <View style={styles.waiterAvatarBG}>
+                                        <MaterialIcons name="person" size={20} color={COLORS.textMuted} />
+                                    </View>
+                                    <View style={styles.listCardContent}>
+                                        <View style={styles.listCardTopRow}>
+                                            <Text style={styles.itemName} numberOfLines={1}>{w.waiter_name || 'Официант'}</Text>
+                                        </View>
+                                        <Text style={styles.itemSubText}>{parseFloat(w.total || '0').toLocaleString()} сум · {w.count} чаевых</Text>
+                                    </View>
+                                </View>
+                            ))}
+                        </>
+                    )}
+
+                    {/* Service Charge Settings */}
+                    <View style={styles.sectionHeaderRow}>
+                        <Text style={styles.sectionTitleDark}>Сервисный сбор</Text>
+                    </View>
+                    <View style={styles.scCard}>
+                        <Text style={styles.scLabel}>Процент сервисного сбора</Text>
+                        <View style={styles.scRow}>
+                            <TextInput
+                                style={styles.scInput}
+                                keyboardType="numeric"
+                                value={serviceChargeInput}
+                                onChangeText={setServiceChargeInput}
+                                placeholder="0"
+                                placeholderTextColor={COLORS.textMuted}
+                            />
+                            <Text style={styles.scPercentSign}>%</Text>
+                        </View>
+                        <TouchableOpacity
+                            style={[styles.scSaveBtn, savingCharge && { opacity: 0.6 }]}
+                            disabled={savingCharge}
+                            onPress={async () => {
+                                const val = parseInt(serviceChargeInput);
+                                if (isNaN(val) || val < 0 || val > 100) {
+                                    Alert.alert('Ошибка', 'Введите значение от 0 до 100');
+                                    return;
+                                }
+                                setSavingCharge(true);
+                                try {
+                                    await updateServiceCharge(val);
+                                    setServiceCharge(val);
+                                    Alert.alert('Готово', `Сервисный сбор: ${val}%`);
+                                } catch {
+                                    Alert.alert('Ошибка', 'Не удалось сохранить');
+                                } finally {
+                                    setSavingCharge(false);
+                                }
+                            }}
+                        >
+                            {savingCharge ? (
+                                <ActivityIndicator color={COLORS.white} size="small" />
+                            ) : (
+                                <Text style={styles.scSaveBtnText}>Сохранить</Text>
+                            )}
+                        </TouchableOpacity>
                     </View>
 
                     {/* Orders by Time (Mock Chart) */}
@@ -352,4 +444,75 @@ const styles = StyleSheet.create({
     waiterAvatar: { width: '100%', height: '100%' },
     ratingBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: COLORS.warningLight, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
     ratingText: { fontSize: 12, fontWeight: '800', color: COLORS.warning },
+    tipStatsContainer: {
+        flexDirection: 'row',
+        gap: 12,
+        paddingHorizontal: 24,
+        marginBottom: 16,
+    },
+    tipStatCard: {
+        flex: 1,
+        backgroundColor: COLORS.white,
+        borderRadius: 16,
+        padding: 16,
+        alignItems: 'center',
+        shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.03, shadowRadius: 12, elevation: 2,
+    },
+    tipStatValue: {
+        fontSize: 22,
+        fontWeight: '800',
+        color: COLORS.textDark,
+    },
+    tipStatLabel: {
+        fontSize: 12,
+        color: COLORS.textMuted,
+        fontWeight: '600',
+        marginTop: 4,
+    },
+    scCard: {
+        backgroundColor: COLORS.white,
+        borderRadius: 24,
+        padding: 20,
+        marginHorizontal: 24,
+        marginBottom: 24,
+        shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.03, shadowRadius: 16, elevation: 2,
+    },
+    scLabel: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: COLORS.textMuted,
+        marginBottom: 8,
+    },
+    scRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        marginBottom: 12,
+    },
+    scInput: {
+        flex: 1,
+        backgroundColor: COLORS.slate100,
+        borderRadius: 12,
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        fontSize: 18,
+        fontWeight: '700',
+        color: COLORS.textDark,
+    },
+    scPercentSign: {
+        fontSize: 18,
+        fontWeight: '700',
+        color: COLORS.textMuted,
+    },
+    scSaveBtn: {
+        backgroundColor: COLORS.primary,
+        borderRadius: 14,
+        paddingVertical: 14,
+        alignItems: 'center',
+    },
+    scSaveBtnText: {
+        color: COLORS.white,
+        fontSize: 16,
+        fontWeight: '700',
+    },
 });

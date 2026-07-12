@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, SafeAreaView, ActivityIndicator, Alert } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, SafeAreaView, ActivityIndicator, Alert, TextInput } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import api from '../../api/client';
+import { getServiceCharge, getSavingsGoal, createTip, contributeToSavings } from '../../api/apiService';
 
 const COLORS = {
     primary: '#ff6b6b',
@@ -13,6 +14,7 @@ const COLORS = {
     cardShadow: 'rgba(0,0,0,0.06)',
     border: '#f0ecec',
     success: '#22c55e',
+    warning: '#f59e0b',
 };
 
 const PAYMENT_METHODS = [
@@ -34,6 +36,19 @@ export default function GuestPaymentScreen({ route, navigation }) {
     const [processing, setProcessing] = useState(false);
     const [success, setSuccess] = useState(false);
 
+    const [serviceChargePercent, setServiceChargePercent] = useState(0);
+    const [tipAmount, setTipAmount] = useState('');
+    const [savingsGoal, setSavingsGoal] = useState(null);
+    const [savingsContribute, setSavingsContribute] = useState('');
+
+    useEffect(() => {
+        getServiceCharge().then(r => setServiceChargePercent(r.percent || 0)).catch(() => {});
+        getSavingsGoal().then(r => setSavingsGoal(r)).catch(() => {});
+    }, []);
+
+    const serviceCharge = total ? Math.round(parseFloat(total) * serviceChargePercent / 100) : 0;
+    const finalTotal = (total ? parseFloat(total) : 0) + serviceCharge + (parseFloat(tipAmount) || 0);
+
     const handlePayment = async () => {
         if (!selectedMethod) {
             Alert.alert('Выберите способ', 'Пожалуйста, выберите способ оплаты');
@@ -47,10 +62,19 @@ export default function GuestPaymentScreen({ route, navigation }) {
 
         setProcessing(true);
         try {
+            // Tip processing
+            if (parseFloat(tipAmount) > 0) {
+                await createTip({ waiter_id: null, amount: parseFloat(tipAmount) }).catch(() => {});
+            }
+            // Savings contribution
+            if (parseFloat(savingsContribute) > 0) {
+                await contributeToSavings(parseFloat(savingsContribute)).catch(() => {});
+            }
             await api.post('/api/v1/guest/payment/init/', {
                 method: selectedMethod,
                 amount: total,
                 order_id: orderId,
+                service_charge: serviceCharge,
             });
             setSuccess(true);
         } catch (err) {
@@ -135,6 +159,70 @@ export default function GuestPaymentScreen({ route, navigation }) {
                     </TouchableOpacity>
                 ))}
 
+                {serviceChargePercent > 0 && (
+                    <View style={styles.extraRow}>
+                        <Text style={styles.extraLabel}>Сервисный сбор ({serviceChargePercent}%)</Text>
+                        <Text style={styles.extraValue}>{serviceCharge.toLocaleString()} UZS</Text>
+                    </View>
+                )}
+
+                <View style={styles.extraRow}>
+                    <Text style={styles.extraLabel}>Итого к оплате</Text>
+                    <Text style={styles.extraValueTotal}>{finalTotal.toLocaleString()} UZS</Text>
+                </View>
+
+                <View style={styles.tipSection}>
+                    <Text style={styles.sectionTitle}>Чаевые официанту</Text>
+                    <View style={styles.tipRow}>
+                        {[5000, 10000, 20000, 50000].map(amount => (
+                            <TouchableOpacity
+                                key={amount}
+                                style={[styles.tipPreset, parseFloat(tipAmount) === amount && styles.tipPresetActive]}
+                                onPress={() => setTipAmount(prev => parseFloat(prev) === amount ? '' : String(amount))}
+                            >
+                                <Text style={[styles.tipPresetText, parseFloat(tipAmount) === amount && styles.tipPresetTextActive]}>
+                                    {amount.toLocaleString()}
+                                </Text>
+                            </TouchableOpacity>
+                        ))}
+                    </View>
+                    <TextInput
+                        style={styles.tipInput}
+                        placeholder="Своя сумма"
+                        placeholderTextColor={COLORS.textMuted}
+                        keyboardType="numeric"
+                        value={tipAmount}
+                        onChangeText={setTipAmount}
+                    />
+                </View>
+
+                {savingsGoal && (
+                    <View style={styles.savingsSection}>
+                        <Text style={styles.sectionTitle}>Копилка: {savingsGoal.name}</Text>
+                        <View style={styles.savingsProgress}>
+                            <View style={styles.savingsProgressTrack}>
+                                <View style={[styles.savingsProgressFill, {
+                                    width: `${Math.min(100, (savingsGoal.current_amount / savingsGoal.target_amount) * 100)}%`
+                                }]} />
+                            </View>
+                            <Text style={styles.savingsProgressText}>
+                                {Math.round((savingsGoal.current_amount / savingsGoal.target_amount) * 100)}%
+                            </Text>
+                        </View>
+                        <Text style={styles.savingsLabel}>
+                            {savingsGoal.current_amount.toLocaleString()} / {savingsGoal.target_amount.toLocaleString()} UZS
+                        </Text>
+                        <TextInput
+                            style={styles.tipInput}
+                            placeholder="Добавить в копилку"
+                            placeholderTextColor={COLORS.textMuted}
+                            keyboardType="numeric"
+                            value={savingsContribute}
+                            onChangeText={setSavingsContribute}
+                        />
+                    </View>
+                )}
+
                 <TouchableOpacity
                     style={[styles.payButton, !selectedMethod && styles.payButtonDisabled, processing && styles.payButtonProcessing]}
                     onPress={handlePayment}
@@ -146,7 +234,7 @@ export default function GuestPaymentScreen({ route, navigation }) {
                         <Text style={styles.payButtonText}>
                             {selectedMethod === 'cash' || selectedMethod === 'cash_onsite'
                                 ? 'Подтвердить'
-                                : 'Оплатить'}
+                                : `Оплатить ${finalTotal.toLocaleString()} UZS`}
                         </Text>
                     )}
                 </TouchableOpacity>
@@ -325,5 +413,98 @@ const styles = StyleSheet.create({
         color: COLORS.white,
         fontSize: 17,
         fontWeight: '700',
+    },
+    extraRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingVertical: 10,
+        borderBottomWidth: 1,
+        borderBottomColor: COLORS.border,
+    },
+    extraLabel: {
+        fontSize: 14,
+        color: COLORS.textMuted,
+        fontWeight: '500',
+    },
+    extraValue: {
+        fontSize: 15,
+        fontWeight: '600',
+        color: COLORS.text,
+    },
+    extraValueTotal: {
+        fontSize: 18,
+        fontWeight: '800',
+        color: COLORS.primary,
+    },
+    tipSection: {
+        marginTop: 20,
+    },
+    tipRow: {
+        flexDirection: 'row',
+        gap: 10,
+        marginBottom: 10,
+    },
+    tipPreset: {
+        flex: 1,
+        paddingVertical: 12,
+        borderRadius: 12,
+        backgroundColor: COLORS.white,
+        borderWidth: 1,
+        borderColor: COLORS.border,
+        alignItems: 'center',
+    },
+    tipPresetActive: {
+        borderColor: COLORS.primary,
+        backgroundColor: COLORS.primary + '10',
+    },
+    tipPresetText: {
+        fontSize: 13,
+        fontWeight: '600',
+        color: COLORS.text,
+    },
+    tipPresetTextActive: {
+        color: COLORS.primary,
+    },
+    tipInput: {
+        backgroundColor: COLORS.white,
+        borderRadius: 12,
+        paddingHorizontal: 14,
+        paddingVertical: 12,
+        fontSize: 15,
+        color: COLORS.text,
+        borderWidth: 1,
+        borderColor: COLORS.border,
+    },
+    savingsSection: {
+        marginTop: 20,
+        gap: 10,
+    },
+    savingsProgress: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+    },
+    savingsProgressTrack: {
+        flex: 1,
+        height: 8,
+        backgroundColor: COLORS.border,
+        borderRadius: 4,
+        overflow: 'hidden',
+    },
+    savingsProgressFill: {
+        height: '100%',
+        backgroundColor: COLORS.warning,
+        borderRadius: 4,
+    },
+    savingsProgressText: {
+        fontSize: 13,
+        fontWeight: '700',
+        color: COLORS.warning,
+    },
+    savingsLabel: {
+        fontSize: 13,
+        color: COLORS.textMuted,
+        fontWeight: '500',
     },
 });

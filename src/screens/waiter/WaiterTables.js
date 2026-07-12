@@ -251,7 +251,10 @@ export default function WaiterTables({ navigation }) {
     };
 
     const handleTablePress = (table) => {
-        if (table.status !== 'RESERVED') {
+        if (table.status === 'RESERVED') return;
+        if (table.is_occupied) {
+            navigation.navigate('OrderModify', { tableNumber: table.number, tableId: table.id });
+        } else {
             navigation.navigate('OrderCreation', { tableNumber: table.number, tableId: table.id });
         }
     };

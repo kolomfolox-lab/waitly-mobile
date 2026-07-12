@@ -43,7 +43,7 @@ export default function StaffManagementScreen({ navigation }) {
     const [refreshing, setRefreshing] = useState(false);
     const [activeFilter, setActiveFilter] = useState('Все');
 
-    const [staff, setStaff] = useState<any[]>([]);
+    const [staff, setStaff] = useState([]);
 
     // Animations
     const fadeAnim = useRef(new Animated.Value(0)).current;

@@ -1,6 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { Platform } from 'react-native';
-import WebApp from '@twa-dev/sdk';
 import Storage from '../utils/storage';
 
 const TelegramContext = createContext(null);
@@ -22,6 +21,7 @@ export function TelegramProvider({ children }) {
     }
 
     try {
+      const WebApp = require('@twa-dev/sdk').default;
       if (WebApp && WebApp.initDataUnsafe) {
         setIsTelegramEnv(true);
         setInitData(WebApp.initData || '');
@@ -52,7 +52,6 @@ export function TelegramProvider({ children }) {
       theme,
       isReady,
       isTelegramEnv,
-      WebApp,
     }}>
       {children}
     </TelegramContext.Provider>

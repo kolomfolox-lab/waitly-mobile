@@ -90,6 +90,7 @@ export const createOrder = async (tableId, items) => {
             items: items.map((item) => ({
                 dish: item.dish || item.dish_id,
                 quantity: Number(item.quantity),
+                comment: item.notes || '',
                 seat_number: item.seat_number,
                 guest_label: item.guest_label,
             })),
@@ -99,6 +100,7 @@ export const createOrder = async (tableId, items) => {
             items: items.map((item) => ({
                 dish_id: item.dish || item.dish_id,
                 quantity: Number(item.quantity),
+                comment: item.notes || '',
                 seat_number: item.seat_number,
                 guest_label: item.guest_label,
             })),
@@ -108,6 +110,7 @@ export const createOrder = async (tableId, items) => {
             items: items.map((item) => ({
                 dish: item.dish || item.dish_id,
                 quantity: Number(item.quantity),
+                comment: item.notes || '',
                 seat_number: item.seat_number,
                 guest_label: item.guest_label,
             })),
@@ -117,6 +120,7 @@ export const createOrder = async (tableId, items) => {
             items: items.map((item) => ({
                 dish_id: item.dish || item.dish_id,
                 quantity: Number(item.quantity),
+                comment: item.notes || '',
                 seat_number: item.seat_number,
                 guest_label: item.guest_label,
             })),
@@ -320,5 +324,77 @@ export const createTable = async (data) => {
 
 export const deleteTable = async (tableId) => {
     const response = await apiClient.delete(`/api/owner/tables/${tableId}/`);
+    return response.data;
+};
+
+// =====================
+// Auth (v1)
+// =====================
+
+export const validateInvite = async (code) => {
+    const response = await apiClient.post('/api/v1/auth/validate-invite/', { code });
+    return response.data;
+};
+
+export const authRegister = async ({ invite_code, phone_number, password, full_name }) => {
+    const response = await apiClient.post('/api/v1/auth/register/', {
+        invite_code, phone_number, password, full_name,
+    });
+    return response.data;
+};
+
+// =====================
+// Guest - Savings Goal
+// =====================
+
+export const getSavingsGoal = async () => {
+    const response = await apiClient.get('/api/v1/guest/savings/goal/');
+    return response.data;
+};
+
+export const updateSavingsGoal = async (data) => {
+    const response = await apiClient.put('/api/v1/guest/savings/goal/', data);
+    return response.data;
+};
+
+export const contributeToSavings = async (amount) => {
+    const response = await apiClient.post('/api/v1/guest/savings/contribute/', { amount });
+    return response.data;
+};
+
+// =====================
+// Guest - Tips
+// =====================
+
+export const createTip = async ({ waiter_id, amount }) => {
+    const response = await apiClient.post('/api/v1/guest/tips/create/', { waiter_id, amount });
+    return response.data;
+};
+
+// =====================
+// Mobile - Tip Stats (Waiter)
+// =====================
+
+export const getWaiterTipStats = async () => {
+    const response = await apiClient.get('/api/v1/mobile/tips/stats/');
+    return response.data;
+};
+
+// =====================
+// Owner - Tip Stats & Service Charge
+// =====================
+
+export const getOwnerTipStats = async () => {
+    const response = await apiClient.get('/api/v1/owner/tips/stats/');
+    return response.data;
+};
+
+export const getServiceCharge = async () => {
+    const response = await apiClient.get('/api/v1/owner/restaurants/service-charge/');
+    return response.data;
+};
+
+export const updateServiceCharge = async (percent) => {
+    const response = await apiClient.put('/api/v1/owner/restaurants/service-charge/', { percent });
     return response.data;
 };

@@ -4,6 +4,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../../context/AuthContext';
 import api from '../../api/client';
+import { getSavingsGoal } from '../../api/apiService';
 
 const COLORS = {
     primary: '#ff6b6b',
@@ -39,13 +40,18 @@ const STATUS_LABELS = {
 export default function GuestProfileScreen({ navigation }) {
     const { user, logout } = useAuth();
     const [orders, setOrders] = useState([]);
+    const [savingsGoal, setSavingsGoal] = useState(null);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
 
     const fetchOrders = useCallback(async () => {
         try {
-            const response = await api.get('/api/v1/guest/orders/active/');
-            setOrders(response.data?.results || response.data || []);
+            const [ordersRes, savingsRes] = await Promise.all([
+                api.get('/api/v1/guest/orders/active/'),
+                getSavingsGoal().catch(() => null),
+            ]);
+            setOrders(ordersRes.data?.results || ordersRes.data || []);
+            if (savingsRes) setSavingsGoal(savingsRes);
         } catch (err) {
             console.log('Failed to load orders:', err.message);
         } finally {
@@ -117,6 +123,28 @@ export default function GuestProfileScreen({ navigation }) {
                         <Text style={styles.actionText}>Написать отзыв</Text>
                     </TouchableOpacity>
                 </View>
+
+                {savingsGoal && (
+                    <TouchableOpacity style={styles.savingsCard} activeOpacity={0.8} onPress={() => navigation.navigate('GuestSavingsGoal')}>
+                        <View style={styles.savingsHeader}>
+                            <MaterialIcons name="savings" size={22} color={COLORS.warning} />
+                            <Text style={styles.savingsTitle}>{savingsGoal.name}</Text>
+                        </View>
+                        <View style={styles.savingsProgressRow}>
+                            <View style={styles.savingsTrack}>
+                                <View style={[styles.savingsFill, {
+                                    width: `${Math.min(100, (savingsGoal.current_amount / savingsGoal.target_amount) * 100)}%`
+                                }]} />
+                            </View>
+                            <Text style={styles.savingsPct}>
+                                {Math.round((savingsGoal.current_amount / savingsGoal.target_amount) * 100)}%
+                            </Text>
+                        </View>
+                        <Text style={styles.savingsAmounts}>
+                            {savingsGoal.current_amount.toLocaleString()} / {savingsGoal.target_amount.toLocaleString()} UZS
+                        </Text>
+                    </TouchableOpacity>
+                )}
 
                 <View style={styles.ordersSection}>
                     <Text style={styles.sectionTitle}>История заказов</Text>
@@ -309,5 +337,56 @@ const styles = StyleSheet.create({
         fontSize: 15,
         fontWeight: '600',
         color: COLORS.danger,
+    },
+    savingsCard: {
+        backgroundColor: COLORS.white,
+        borderRadius: 16,
+        padding: 16,
+        marginHorizontal: 20,
+        marginTop: 16,
+        shadowColor: COLORS.cardShadow,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 1,
+        shadowRadius: 12,
+        elevation: 3,
+        gap: 8,
+    },
+    savingsHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+    },
+    savingsTitle: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: COLORS.text,
+        flex: 1,
+    },
+    savingsProgressRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+    },
+    savingsTrack: {
+        flex: 1,
+        height: 8,
+        backgroundColor: COLORS.border,
+        borderRadius: 4,
+        overflow: 'hidden',
+    },
+    savingsFill: {
+        height: '100%',
+        backgroundColor: COLORS.warning,
+        borderRadius: 4,
+    },
+    savingsPct: {
+        fontSize: 13,
+        fontWeight: '700',
+        color: COLORS.warning,
+    },
+    savingsAmounts: {
+        fontSize: 13,
+        color: COLORS.textMuted,
+        fontWeight: '500',
     },
 });

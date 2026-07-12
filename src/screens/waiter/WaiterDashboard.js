@@ -15,7 +15,7 @@ import { useAuth } from '../../context/AuthContext';
 import { MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect } from '@react-navigation/native';
-import { getOrders, getTables, getTodayBookings } from '../../api/apiService';
+import { getOrders, getTables, getTodayBookings, getWaiterTipStats } from '../../api/apiService';
 import UserAvatar from '../../components/common/UserAvatar';
 import { loadStoredAvatarPreset } from '../../utils/avatar';
 
@@ -52,6 +52,7 @@ export default function WaiterDashboard({ navigation }) {
     });
 
     const [recentActions, setRecentActions] = useState([]);
+    const [tipStats, setTipStats] = useState({ total: '0', count: 0 });
 
     // Animations
     const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -83,11 +84,13 @@ export default function WaiterDashboard({ navigation }) {
     const fetchDashboardData = useCallback(async () => {
         try {
             // Fetch everything we need for the dashboard
-            const [ordersData, tablesData, bookingsData] = await Promise.all([
+            const [ordersData, tablesData, bookingsData, tipsData] = await Promise.all([
                 getOrders().catch(() => ({ results: [] })),
                 getTables().catch(() => ({ results: [] })),
-                getTodayBookings().catch(() => [])
+                getTodayBookings().catch(() => []),
+                getWaiterTipStats().catch(() => ({ total: '0', count: 0 })),
             ]);
+            setTipStats(tipsData);
 
             const orders = ordersData.results || ordersData || [];
             const tables = tablesData.results || tablesData || [];
@@ -245,6 +248,22 @@ export default function WaiterDashboard({ navigation }) {
                         </View>
                     </LinearGradient>
                 </Animated.View>
+
+                {/* Tips Card */}
+                {parseFloat(tipStats.total) > 0 && (
+                    <Animated.View style={{ opacity: fadeAnim }}>
+                        <View style={styles.tipsCard}>
+                            <View style={styles.tipsCardLeft}>
+                                <MaterialIcons name="volunteer-activism" size={28} color={COLORS.success} />
+                                <View>
+                                    <Text style={styles.tipsLabel}>Чаевые получено</Text>
+                                    <Text style={styles.tipsAmount}>{parseFloat(tipStats.total).toLocaleString()} сум</Text>
+                                </View>
+                            </View>
+                            <Text style={styles.tipsCount}>{tipStats.count} чаевых</Text>
+                        </View>
+                    </Animated.View>
+                )}
 
                 {/* Stats Grid */}
                 <Animated.View style={[styles.statsGrid, { opacity: fadeAnim, transform: [{ translateY }] }]}>
@@ -533,5 +552,39 @@ const styles = StyleSheet.create({
     emptyText: {
         color: COLORS.textMuted,
         fontSize: 14,
-    }
+    },
+    tipsCard: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        backgroundColor: COLORS.white,
+        borderRadius: 16,
+        padding: 16,
+        marginBottom: 16,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.04,
+        shadowRadius: 8,
+        elevation: 2,
+    },
+    tipsCardLeft: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+    },
+    tipsLabel: {
+        fontSize: 13,
+        color: COLORS.textMuted,
+        fontWeight: '500',
+    },
+    tipsAmount: {
+        fontSize: 18,
+        fontWeight: '800',
+        color: COLORS.textDark,
+    },
+    tipsCount: {
+        fontSize: 13,
+        fontWeight: '600',
+        color: COLORS.success,
+    },
 });
