@@ -189,6 +189,16 @@ export const cancelOrder = async (orderId, payload = {}) => {
     return response.data;
 };
 
+export const requestBill = async (orderId) => {
+    const response = await apiClient.post(`/api/orders/orders/${orderId}/request_bill/`);
+    return response.data;
+};
+
+export const markPaid = async (orderId) => {
+    const response = await apiClient.post(`/api/orders/orders/${orderId}/mark_paid/`);
+    return response.data;
+};
+
 // =====================
 // Work Shifts
 // =====================

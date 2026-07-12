@@ -13,7 +13,8 @@ import {
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
-import { getOrders, acceptOrder, startCooking, markReady, deliverOrder } from '../../api/apiService';
+import { getOrders, acceptOrder, deliverOrder, requestBill, markPaid } from '../../api/apiService';
+import { startCookingOrder, markOrderReady } from '../../api/orders';
 import apiClient from '../../api/apiClient';
 
 const COLORS = {
@@ -34,6 +35,8 @@ const STATUS_LABELS = {
     COOKING: 'Готовится',
     READY: 'Готов',
     DELIVERED: 'Доставлен',
+    AWAITING_PAYMENT: 'Ожидает оплаты',
+    PAID: 'Оплачен',
     CANCELLED: 'Отменён',
 };
 
@@ -43,6 +46,8 @@ const STATUS_COLORS = {
     COOKING: COLORS.warning,
     READY: COLORS.success,
     DELIVERED: COLORS.textMuted,
+    AWAITING_PAYMENT: COLORS.warning,
+    PAID: COLORS.success,
     CANCELLED: COLORS.danger,
 };
 
@@ -163,12 +168,17 @@ export default function OrderModifyScreen({ route, navigation }) {
         return `${Math.floor(diff / 60)} ч назад`;
     };
 
-    const updateOrderStatus = async (orderId, action) => {
+    const updateOrderStatus = async (orderId, action, order) => {
         try {
             if (action === 'accept') await acceptOrder(orderId);
-            else if (action === 'cooking') await startCooking(orderId);
-            else if (action === 'ready') await markReady(orderId);
+            else if (action === 'cooking') await startCookingOrder(orderId);
+            else if (action === 'ready') await markOrderReady(orderId);
             else if (action === 'deliver') await deliverOrder(orderId);
+            else if (action === 'bill') {
+                await requestBill(orderId);
+                setBillOrder({ ...order, status: 'AWAITING_PAYMENT' });
+                return;
+            } else if (action === 'paid') await markPaid(orderId);
             await fetchData();
         } catch (e) {
             Alert.alert('Ошибка', 'Не удалось обновить статус');
@@ -184,13 +194,16 @@ export default function OrderModifyScreen({ route, navigation }) {
             case 'COOKING':
                 return [{ key: 'ready', label: 'Готов', icon: 'done', color: COLORS.success }];
             case 'READY':
-                return [{ key: 'deliver', label: 'Доставлено', icon: 'local-shipping', color: COLORS.primary }];
+                return [{ key: 'deliver', label: 'Доставлено', icon: 'local-shipping', color: COLORS.primary },
+                        { key: 'bill', label: 'Выставить счёт', icon: 'receipt', color: COLORS.textDark }];
+            case 'DELIVERED':
+                return [{ key: 'bill', label: 'Выставить счёт', icon: 'receipt', color: COLORS.textDark }];
+            case 'AWAITING_PAYMENT':
+                return [{ key: 'paid', label: 'Оплачено', icon: 'check-circle', color: COLORS.success }];
             default:
                 return [];
         }
     };
-
-    const canShowBill = (status) => ['READY', 'DELIVERED'].includes(status);
 
     return (
         <SafeAreaView style={styles.container}>
@@ -270,21 +283,12 @@ export default function OrderModifyScreen({ route, navigation }) {
                                     <TouchableOpacity
                                         key={action.key}
                                         style={[styles.actionBtn, { backgroundColor: action.color }]}
-                                        onPress={() => updateOrderStatus(order.id, action.key)}
+                                        onPress={() => updateOrderStatus(order.id, action.key, order)}
                                     >
                                         <MaterialIcons name={action.icon} size={18} color={COLORS.white} />
                                         <Text style={styles.actionBtnText}>{action.label}</Text>
                                     </TouchableOpacity>
                                 ))}
-                                {canShowBill(order.status) && (
-                                    <TouchableOpacity
-                                        style={[styles.actionBtn, { backgroundColor: COLORS.textDark }]}
-                                        onPress={() => setBillOrder(order)}
-                                    >
-                                        <MaterialIcons name="receipt" size={18} color={COLORS.white} />
-                                        <Text style={styles.actionBtnText}>Счёт</Text>
-                                    </TouchableOpacity>
-                                )}
                             </View>
                         </View>
                     ))}
