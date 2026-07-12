@@ -173,7 +173,7 @@ export default function OrderModifyScreen({ route, navigation }) {
         }
     };
 
-    const hasDeliveredOrders = orders.some(o => o.status === 'DELIVERED');
+    const hasBillableOrders = orders.some(o => o.status === 'DELIVERED' || o.status === 'AWAITING_PAYMENT');
     const hasActiveOrders = orders.some(o => ['CREATED', 'ACCEPTED', 'COOKING', 'READY'].includes(o.status));
 
     const allItems = orders.flatMap(o =>
@@ -229,7 +229,7 @@ export default function OrderModifyScreen({ route, navigation }) {
                 </TouchableOpacity>
                 <Text style={styles.headerTitle}>Стол {tableNumber}</Text>
                 <View style={styles.headerActions}>
-                    {hasDeliveredOrders && (
+                    {hasBillableOrders && (
                         <TouchableOpacity style={styles.billHeaderBtn} onPress={() => setShowBillOptions(true)}>
                             <MaterialIcons name="receipt" size={18} color={COLORS.white} />
                             <Text style={styles.billHeaderBtnText}>Счёт</Text>
