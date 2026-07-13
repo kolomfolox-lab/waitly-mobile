@@ -254,7 +254,7 @@ export default function WaiterDashboard({ navigation }) {
                             </Animated.View>
                         ))}
                     </View>
-                ) : (
+                ) : (<>
                 <Animated.View style={[styles.header, { opacity: fadeAnim, transform: [{ translateY }] }]}>
                     <View>
                         <Text style={styles.greeting}>{getGreeting()}, {user?.full_name?.split(' ')[0] || 'Официант'}!</Text>
@@ -384,7 +384,7 @@ export default function WaiterDashboard({ navigation }) {
                         </View>
                     )}
                 </Animated.View>
-                )}
+                </>)}
             </ScrollView>
         </SafeAreaView>
     );
