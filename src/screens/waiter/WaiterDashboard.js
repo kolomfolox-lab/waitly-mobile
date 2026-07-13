@@ -44,6 +44,10 @@ export default function WaiterDashboard({ navigation }) {
     const [refreshing, setRefreshing] = useState(false);
     const [avatarPresetId, setAvatarPresetId] = useState(null);
 
+    const [loading, setLoading] = useState(true);
+    const [loadError, setLoadError] = useState(null);
+    const shimmerAnim = useRef(new Animated.Value(0)).current;
+
     const [stats, setStats] = useState({
         tables: { total: 0, available: 0 },
         orders: { active: 0, readyToDeliver: 0 },
@@ -79,9 +83,26 @@ export default function WaiterDashboard({ navigation }) {
                 useNativeDriver: true,
             }),
         ]).start();
+
+        // Shimmer loop
+        const shimmerLoop = Animated.loop(
+            Animated.sequence([
+                Animated.timing(shimmerAnim, { toValue: 1, duration: 800, useNativeDriver: true }),
+                Animated.timing(shimmerAnim, { toValue: 0, duration: 800, useNativeDriver: true }),
+            ]),
+        );
+        shimmerLoop.start();
+        return () => shimmerLoop.stop();
     }, []);
 
-    const fetchDashboardData = useCallback(async () => {
+    const shimmerOpacity = shimmerAnim.interpolate({
+        inputRange: [0, 1],
+        outputRange: [0.3, 0.7],
+    });
+
+    const fetchDashboardData = useCallback(async (isRetry) => {
+        if (!isRetry) setLoading(true);
+        setLoadError(null);
         try {
             // Fetch everything we need for the dashboard
             const [ordersData, tablesData, bookingsData, tipsData] = await Promise.all([
@@ -138,6 +159,9 @@ export default function WaiterDashboard({ navigation }) {
 
         } catch (e) {
             console.log('Dashboard fetch failed:', e.message);
+            setLoadError(e.message);
+        } finally {
+            setLoading(false);
         }
     }, []);
 
@@ -170,7 +194,7 @@ export default function WaiterDashboard({ navigation }) {
 
     const onRefresh = useCallback(async () => {
         setRefreshing(true);
-        await fetchDashboardData();
+        await fetchDashboardData(true);
         setRefreshing(false);
     }, [fetchDashboardData]);
 
@@ -190,6 +214,22 @@ export default function WaiterDashboard({ navigation }) {
         return Math.round(val).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ') + ' сум';
     };
 
+    if (loadError && !loading && stats.tables.total === 0) {
+        return (
+            <SafeAreaView style={styles.container}>
+                <View style={styles.errorContainer}>
+                    <MaterialIcons name="wifi-off" size={64} color={COLORS.textMuted} />
+                    <Text style={styles.errorTitle}>Нет подключения</Text>
+                    <Text style={styles.errorSub}>Не удаётся связаться с сервером</Text>
+                    <TouchableOpacity style={styles.retryBtn} onPress={fetchDashboardData}>
+                        <MaterialIcons name="refresh" size={20} color={COLORS.white} />
+                        <Text style={styles.retryBtnText}>Повторить</Text>
+                    </TouchableOpacity>
+                </View>
+            </SafeAreaView>
+        );
+    }
+
     return (
         <SafeAreaView style={styles.container}>
             <ScrollView
@@ -198,7 +238,23 @@ export default function WaiterDashboard({ navigation }) {
                 refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.primary} />}
                 showsVerticalScrollIndicator={false}
             >
-                {/* Header */}
+                {loading ? (
+                    <View style={styles.skeletonWrap}>
+                        {[1, 2, 3].map(i => (
+                            <Animated.View key={i} style={[styles.skeletonCard, { opacity: shimmerOpacity }]}>
+                                <View style={styles.skeletonRow}>
+                                    <View style={styles.skeletonCircle} />
+                                    <View style={styles.skeletonCol}>
+                                        <View style={styles.skeletonLineWide} />
+                                        <View style={styles.skeletonLineShort} />
+                                    </View>
+                                </View>
+                                <View style={styles.skeletonLineMedium} />
+                                <View style={styles.skeletonLineShort} />
+                            </Animated.View>
+                        ))}
+                    </View>
+                ) : (
                 <Animated.View style={[styles.header, { opacity: fadeAnim, transform: [{ translateY }] }]}>
                     <View>
                         <Text style={styles.greeting}>{getGreeting()}, {user?.full_name?.split(' ')[0] || 'Официант'}!</Text>
@@ -328,6 +384,7 @@ export default function WaiterDashboard({ navigation }) {
                         </View>
                     )}
                 </Animated.View>
+                )}
             </ScrollView>
         </SafeAreaView>
     );
@@ -587,5 +644,88 @@ const styles = StyleSheet.create({
         fontSize: 13,
         fontWeight: '600',
         color: COLORS.success,
+    },
+    skeletonWrap: {
+        paddingTop: 20,
+    },
+    skeletonCard: {
+        backgroundColor: COLORS.white,
+        borderRadius: 16,
+        padding: 20,
+        marginBottom: 16,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.04,
+        shadowRadius: 8,
+        elevation: 2,
+    },
+    skeletonRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 16,
+        gap: 12,
+    },
+    skeletonCircle: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: COLORS.slate200,
+    },
+    skeletonCol: {
+        flex: 1,
+        gap: 8,
+    },
+    skeletonLineWide: {
+        height: 14,
+        borderRadius: 7,
+        backgroundColor: COLORS.slate200,
+        width: '70%',
+    },
+    skeletonLineMedium: {
+        height: 12,
+        borderRadius: 6,
+        backgroundColor: COLORS.slate100,
+        width: '50%',
+        marginBottom: 8,
+    },
+    skeletonLineShort: {
+        height: 12,
+        borderRadius: 6,
+        backgroundColor: COLORS.slate100,
+        width: '35%',
+    },
+    errorContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        paddingHorizontal: 40,
+    },
+    errorTitle: {
+        fontSize: 20,
+        fontWeight: '800',
+        color: COLORS.textDark,
+        marginTop: 20,
+        marginBottom: 8,
+    },
+    errorSub: {
+        fontSize: 15,
+        color: COLORS.textMuted,
+        textAlign: 'center',
+        marginBottom: 24,
+        lineHeight: 22,
+    },
+    retryBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        backgroundColor: COLORS.primary,
+        paddingHorizontal: 28,
+        paddingVertical: 14,
+        borderRadius: 14,
+    },
+    retryBtnText: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: COLORS.white,
     },
 });
