@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import {
     View,
     Text,
@@ -78,6 +78,14 @@ export default function OrderCreationScreen({ route, navigation }) {
     const [menuError, setMenuError] = useState('');
     const [showCartModal, setShowCartModal] = useState(false);
     const [editingNotes, setEditingNotes] = useState({});
+    const [searchQuery, setSearchQuery] = useState('');
+
+    const filteredDishes = useMemo(() => {
+        const byCat = activeCategory === 'all' ? dishes : dishes.filter(d => d.category === activeCategory);
+        if (!searchQuery.trim()) return byCat;
+        const q = searchQuery.toLowerCase().trim();
+        return byCat.filter(d => d.name.toLowerCase().includes(q));
+    }, [dishes, activeCategory, searchQuery]);
 
     const fadeAnim = useRef(new Animated.Value(0)).current;
 
@@ -115,10 +123,7 @@ export default function OrderCreationScreen({ route, navigation }) {
         }
     }, []);
 
-    const getFilteredDishes = () => {
-        if (activeCategory === 'all') return dishes;
-        return dishes.filter(d => d.category === activeCategory);
-    };
+    const getFilteredDishes = () => filteredDishes;
 
     const cartKey = (dishId, seatNumber = activeSeat) => `${dishId}::seat-${seatNumber}`;
 
@@ -294,6 +299,23 @@ export default function OrderCreationScreen({ route, navigation }) {
                     })}
                 </ScrollView>
             </Animated.View>
+
+            {/* Search */}
+            <View style={styles.searchWrap}>
+                <MaterialIcons name="search" size={20} color={COLORS.textMuted} style={styles.searchIcon} />
+                <TextInput
+                    style={styles.searchInput}
+                    placeholder="Поиск блюд..."
+                    placeholderTextColor={COLORS.textMuted}
+                    value={searchQuery}
+                    onChangeText={setSearchQuery}
+                />
+                {searchQuery.length > 0 && (
+                    <TouchableOpacity onPress={() => setSearchQuery('')} style={styles.searchClear}>
+                        <MaterialIcons name="close" size={18} color={COLORS.textMuted} />
+                    </TouchableOpacity>
+                )}
+            </View>
 
             {/* Dish List */}
             {loading ? (
@@ -915,5 +937,32 @@ const styles = StyleSheet.create({
         color: COLORS.white,
         fontSize: 17,
         fontWeight: '700',
+    },
+    searchWrap: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginHorizontal: 16,
+        marginBottom: 12,
+        backgroundColor: COLORS.white,
+        borderRadius: 12,
+        paddingHorizontal: 12,
+        height: 42,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.04,
+        shadowRadius: 4,
+        elevation: 1,
+    },
+    searchIcon: {
+        marginRight: 8,
+    },
+    searchInput: {
+        flex: 1,
+        fontSize: 15,
+        color: COLORS.textDark,
+        paddingVertical: 0,
+    },
+    searchClear: {
+        padding: 4,
     },
 });

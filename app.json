@@ -36,7 +36,7 @@
     "extra": {
       "apiUrl": "http://192.168.31.106:8000",
       "eas": {
-        "projectId": "ddff1f72-836b-427f-9cd7-181aa9871719"
+        "projectId": "2412e9bc-ff38-4f36-954e-fa986cac7370"
       }
     },
     "plugins": [
@@ -52,6 +52,7 @@
     ],
     "experiments": {
       "baseUrl": "/"
-    }
+    },
+    "owner": "waitlydevelopers-team"
   }
 }
