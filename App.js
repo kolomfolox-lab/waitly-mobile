@@ -50,7 +50,9 @@ function PushRegistrar({ children }) {
         }
         if (finalStatus !== 'granted') return;
 
-        const tokenData = await Notifications.getExpoPushTokenAsync();
+        const tokenData = await Notifications.getExpoPushTokenAsync({
+          projectId: 'ddff1f72-836b-427f-9cd7-181aa9871719',
+        });
         const token = tokenData.data;
 
         await registerPushToken(token, Platform.OS === 'ios' ? 'IOS' : 'ANDROID');
