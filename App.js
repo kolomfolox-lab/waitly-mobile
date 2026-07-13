@@ -1,6 +1,6 @@
 import 'react-native-gesture-handler';
 import React, { useEffect, useRef } from 'react';
-import { Platform, AppState } from 'react-native';
+import { Platform } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import * as Notifications from 'expo-notifications';
 import Storage from './src/utils/storage';
