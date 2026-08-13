@@ -1,518 +1,225 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-    View,
-    Text,
-    StyleSheet,
-    TouchableOpacity,
-    SafeAreaView,
-    ScrollView,
-    Animated,
-    RefreshControl,
-    Dimensions,
-    Image,
-    TextInput,
-    Alert,
-    ActivityIndicator,
+    ActivityIndicator, RefreshControl, SafeAreaView,
+    ScrollView, StyleSheet, Text, TouchableOpacity, View,
 } from 'react-native';
-import { MaterialIcons, Ionicons } from '@expo/vector-icons';
-import { useFocusEffect } from '@react-navigation/native';
+import { MaterialIcons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
-import { getOwnerStats, getOwnerTodayOrders, getDishes, getOwnerStaff, getOwnerTipStats, getServiceCharge, updateServiceCharge } from '../../api/apiService';
+import {
+    getOwnerDashboardSummary, getOwnerStaffPerformance,
+    getOwnerDashboardAnalytics, getMobileInventorySummary,
+} from '../../api/apiService';
 
-const COLORS = {
-    primary: '#FF6B6B',
-    backgroundLight: '#F8F9FA',
-    success: '#52D681',
-    successLight: '#E6F8ED',
-    warning: '#F7B731',
-    warningLight: '#FEF5E6',
-    danger: '#FF4757',
-    dangerLight: '#FFE8EA',
-    white: '#FFFFFF',
-    textDark: '#0B1527',
-    textMuted: '#8F9BB3',
-    slate100: '#F1F5F9',
-    chartLine: '#FFA4A4'
+const C = {
+    primary: '#ff6b6b', primarySoft: 'rgba(255,107,107,0.12)',
+    bg: '#f8f5f5', card: '#ffffff', border: '#e2e8f0',
+    text: '#0f172a', muted: '#94a3b8', success: '#52D681',
+    warning: '#F7B731', accent: '#667eea',
 };
 
-const { width } = Dimensions.get('window');
+function fmt(n) {
+    if (n == null) return '0';
+    return Number(n).toLocaleString('ru-RU');
+}
 
 export default function OwnerDashboard({ navigation }) {
-    const { user, subscriptionLock } = useAuth();
-    const [stats, setStats] = useState(null);
-    const [todayOrders, setTodayOrders] = useState([]);
-    const [dishes, setDishes] = useState([]);
+    const { user } = useAuth();
+    const [summary, setSummary] = useState(null);
     const [staff, setStaff] = useState([]);
+    const [analytics, setAnalytics] = useState(null);
+    const [inventory, setInventory] = useState([]);
+    const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
-    const [ownerTipStats, setOwnerTipStats] = useState(null);
-    const [serviceCharge, setServiceCharge] = useState(0);
-    const [serviceChargeInput, setServiceChargeInput] = useState('');
-    const [savingCharge, setSavingCharge] = useState(false);
 
-    const fadeAnim = useRef(new Animated.Value(0)).current;
-
-    useEffect(() => {
-        Animated.timing(fadeAnim, { toValue: 1, duration: 600, useNativeDriver: true }).start();
-    }, []);
-
-    const fetchData = useCallback(async () => {
+    const loadAll = useCallback(async () => {
         try {
-            const [statsData, ordersData, dishesData, staffData, tipData, scData] = await Promise.all([
-                getOwnerStats().catch(() => null),
-                getOwnerTodayOrders().catch(() => []),
-                getDishes().catch(() => []),
-                getOwnerStaff().catch(() => []),
-                getOwnerTipStats().catch(() => null),
-                getServiceCharge().catch(() => null),
+            const [s, st, a, inv] = await Promise.all([
+                getOwnerDashboardSummary(),
+                getOwnerStaffPerformance(),
+                getOwnerDashboardAnalytics(),
+                getMobileInventorySummary(),
             ]);
-
-            if (statsData) setStats(statsData);
-            setTodayOrders(Array.isArray(ordersData) ? ordersData : (ordersData?.results || []));
-            setDishes(Array.isArray(dishesData) ? dishesData : (dishesData?.results || []));
-            setStaff(Array.isArray(staffData) ? staffData : (staffData?.results || []));
-            if (tipData) setOwnerTipStats(tipData);
-            if (scData) {
-                setServiceCharge(scData.percent || 0);
-                setServiceChargeInput(String(scData.percent || 0));
-            }
-        } catch (e) {
-            console.log('Owner stats failed:', e.message);
-        }
+            setSummary(s);
+            setStaff(st?.staff_performance || []);
+            setAnalytics(a);
+            setInventory(inv?.results || inv || []);
+        } catch { /* silent */ }
+        finally { setLoading(false); setRefreshing(false); }
     }, []);
 
-    useFocusEffect(useCallback(() => { fetchData(); }, [fetchData]));
+    useEffect(() => { loadAll(); }, [loadAll]);
 
-    const onRefresh = useCallback(async () => {
-        setRefreshing(true);
-        await fetchData();
-        setRefreshing(false);
-    }, [fetchData]);
+    const netProfit = useMemo(() => {
+        const rev = Number(analytics?.summary?.revenue_30_days || summary?.revenue_30_days || 0);
+        const cost = Number(analytics?.summary?.cost_30_days || 0);
+        return rev - cost;
+    }, [analytics, summary]);
 
-    const formatCurrency = (val) => {
-        const num = typeof val === 'string' ? parseFloat(val) : (val || 0);
-        return Math.round(num).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',') + ' СУМ';
-    };
+    const topWaiters = useMemo(() =>
+        [...staff].filter(s => s.role === 'WAITER').sort((a, b) => b.revenue - a.revenue).slice(0, 5),
+        [staff],
+    );
 
-    const totalRevenue = todayOrders.reduce((sum, o) => sum + (parseFloat(o.total_amount) || 0), 0);
-    const avgCheck = todayOrders.length > 0 ? (totalRevenue / todayOrders.length) : 0;
+    const topDishes = useMemo(() => {
+        const raw = analytics?.top_dishes || analytics?.popular_dishes || [];
+        return [...raw].sort((a, b) => (b.total_sold || 0) - (a.total_sold || 0)).slice(0, 5);
+    }, [analytics]);
 
-    const topDishes: any[] = [];
-    const topWaiters: any[] = [];
+    const lowStock = useMemo(() =>
+        (inventory || []).filter(i => i.is_low || i.is_empty).slice(0, 5),
+        [inventory],
+    );
 
-    const restaurantName = user?.restaurant_name || 'Ресторан Sezam';
-    const networkName = user?.network_name || 'Сеть Sezam';
+    const maxOrders = useMemo(() => {
+        const hourly = analytics?.hourly_breakdown || [];
+        return Math.max(...hourly.map(h => Number(h.order_count || 0)), 1);
+    }, [analytics]);
+
+    if (loading) {
+        return (
+            <View style={styles.center}>
+                <ActivityIndicator size="large" color={C.primary} />
+                <Text style={{ color: C.muted, marginTop: 12, fontWeight: '700' }}>Дашборд...</Text>
+            </View>
+        );
+    }
+
+    const Metric = ({ label, value, icon, color }) => (
+        <View style={styles.metric}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                <Text style={styles.metricL}>{label}</Text>
+                <MaterialIcons name={icon} size={18} color={color || C.muted} />
+            </View>
+            <Text style={[styles.metricV, color ? { color } : {}]}>{fmt(value)}</Text>
+        </View>
+    );
+
+    const Section = ({ title, icon, count, link, children }) => (
+        <View style={styles.section}>
+            <View style={styles.sh}>
+                <MaterialIcons name={icon} size={18} color={C.text} />
+                <Text style={styles.st}>{title}</Text>
+                {count != null && <Text style={styles.sc}>{count}</Text>}
+                {link && <TouchableOpacity style={{ marginLeft: 'auto' }} onPress={() => navigation?.navigate(link)}><Text style={styles.link}>{'Весь'}</Text></TouchableOpacity>}
+            </View>
+            {children}
+        </View>
+    );
 
     return (
         <SafeAreaView style={styles.container}>
-            <Animated.View style={{ flex: 1, opacity: fadeAnim }}>
-                <ScrollView
-                    contentContainerStyle={styles.scrollContent}
-                    refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.primary} />}
-                    showsVerticalScrollIndicator={false}
-                >
-                    {/* Header */}
-                    <View style={styles.header}>
-                        <View style={styles.headerTitleRow}>
-                            <View style={styles.logoIcon}>
-                                <MaterialIcons name="restaurant" size={20} color={COLORS.white} />
-                            </View>
-                            <View>
-                                <Text style={styles.headerTitle}>{restaurantName}</Text>
-                                <Text style={styles.headerSub}>{networkName}</Text>
-                            </View>
-                        </View>
-                        <View style={styles.headerActions}>
-                            {subscriptionLock.blocked ? (
-                                <View style={styles.subscriptionWarning}>
-                                    <MaterialIcons name="warning" size={14} color="#fff" />
-                                    <Text style={styles.subscriptionWarningText}>Нет подписки</Text>
-                                </View>
-                            ) : subscriptionLock.subscriptionExpiresAt ? (
-                                <Text style={styles.subscriptionActive}>Активна до {new Date(subscriptionLock.subscriptionExpiresAt).toLocaleDateString('ru-RU')}</Text>
-                            ) : null}
-                            <TouchableOpacity style={styles.calendarBtn}>
-                                <MaterialIcons name="date-range" size={24} color={COLORS.primary} />
-                            </TouchableOpacity>
-                        </View>
+            <ScrollView refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadAll(); }} />}>
+                <View style={styles.header}>
+                    <View>
+                        <Text style={styles.kicker}>Owner</Text>
+                        <Text style={styles.title}>Кабинет</Text>
+                        <Text style={styles.sub}>{user?.full_name || ''}</Text>
                     </View>
+                    <TouchableOpacity style={styles.hBtn}><MaterialIcons name="more-horiz" size={22} color={C.text} /></TouchableOpacity>
+                </View>
 
-                    {/* Overview Header */}
-                    <View style={styles.sectionHeaderRow}>
-                        <Text style={styles.sectionTitle}>ОБЗОР</Text>
-                        <TouchableOpacity style={styles.dropdownBtn}>
-                            <Text style={styles.dropdownText}>Неделя</Text>
-                            <MaterialIcons name="keyboard-arrow-down" size={18} color={COLORS.textDark} />
-                        </TouchableOpacity>
-                    </View>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ paddingLeft: 16 }} contentContainerStyle={{ gap: 10, paddingRight: 16, paddingTop: 12 }}>
+                    <Metric label="Выручка 30д" value={summary?.revenue_30_days || 0} icon="trending-up" color={C.success} />
+                    <Metric label="Прибыль" value={netProfit} icon="account-balance" color={C.accent} />
+                    <Metric label="Сегодня" value={summary?.revenue_today || 0} icon="today" color={C.primary} />
+                    <Metric label="Заказы" value={summary?.orders_today || 0} icon="receipt" />
+                    <Metric label="Активные" value={summary?.active_orders || 0} icon="local-fire-department" color={C.warning} />
+                    <Metric label="Столы" value={summary?.tables_count || 0} icon="table-restaurant" />
+                </ScrollView>
 
-                    {/* Metric Cards (Orders, Revenue, Avg check matching image copy 5) */}
-                    <View style={styles.metricsContainer}>
-                        {/* Orders */}
-                        <View style={styles.metricCard}>
-                            <View style={styles.metricRow}>
-                                <Text style={styles.metricLabel}>Заказы</Text>
-                                <View style={[styles.badgePill, { backgroundColor: COLORS.successLight }]}>
-                                    <Text style={[styles.badgeText, { color: COLORS.success }]}>+12%</Text>
-                                </View>
+                <Section title="Официанты" icon="people" count={staff.filter(s => s.role === 'WAITER').length} link="StaffScreen">
+                    {topWaiters.length === 0 ? (
+                        <View style={styles.empty}><Text style={styles.et}>Нет данных</Text></View>
+                    ) : topWaiters.map((w, i) => (
+                        <View key={w.staff_id} style={styles.row}>
+                            <View style={styles.rb}><Text style={styles.rt}>{i + 1}</Text></View>
+                            <View style={{ flex: 1, marginLeft: 10 }}>
+                                <Text style={styles.rn}>{w.full_name}</Text>
+                                <Text style={styles.rs}>{w.delivered_orders} зак · {w.shifts_count} смен</Text>
                             </View>
-                            <Text style={styles.metricValue}>{todayOrders.length > 0 ? todayOrders.length : 0}</Text>
+                            <Text style={styles.rv}>{fmt(w.revenue)}</Text>
                         </View>
+                    ))}
+                </Section>
 
-                        {/* Revenue */}
-                        <View style={styles.metricCard}>
-                            <View style={styles.metricRow}>
-                                <Text style={styles.metricLabel}>Выручка</Text>
-                                <View style={[styles.badgePill, { backgroundColor: COLORS.successLight }]}>
-                                    <Text style={[styles.badgeText, { color: COLORS.success }]}>+8%</Text>
-                                </View>
+                <Section title="Популярные блюда" icon="restaurant-menu" count={topDishes.length}>
+                    {topDishes.length === 0 ? (
+                        <View style={styles.empty}><Text style={styles.et}>Нет продаж</Text></View>
+                    ) : topDishes.map((d, i) => (
+                        <View key={i} style={styles.row}>
+                            <View style={styles.rb}><Text style={styles.rt}>{i + 1}</Text></View>
+                            <View style={{ flex: 1, marginLeft: 10 }}>
+                                <Text style={styles.rn}>{d.name || d.dish_name}</Text>
+                                <Text style={styles.rs}>{d.total_sold} шт</Text>
                             </View>
-                            <View style={styles.valueRow}>
-                                <Text style={styles.metricValue}>{totalRevenue > 0 ? formatCurrency(totalRevenue).split(' ')[0] : '0'}</Text>
-                                <Text style={styles.metricCurrency}>СУМ</Text>
+                            <Text style={styles.rv}>{fmt(d.total_revenue)}</Text>
+                        </View>
+                    ))}
+                </Section>
+
+                <Section title="Склад" icon="inventory" count={lowStock.length > 0 ? lowStock.length : null} link="InventoryScreen">
+                    {lowStock.length === 0 ? (
+                        <View style={styles.empty}><MaterialIcons name="check-circle" size={22} color={C.success} /><Text style={[styles.et, { color: C.success, marginLeft: 4 }]}>Всё в норме</Text></View>
+                    ) : lowStock.map((item, i) => (
+                        <View key={i} style={styles.row}>
+                            <MaterialIcons name={item.is_empty ? 'error' : 'warning'} size={18} color={item.is_empty ? C.primary : C.warning} />
+                            <View style={{ flex: 1, marginLeft: 10 }}>
+                                <Text style={styles.rn}>{item.ingredient_name}</Text>
+                                <Text style={styles.rs}>{item.quantity} {item.unit} {item.is_empty ? '(пусто)' : '(мало)'}</Text>
                             </View>
                         </View>
+                    ))}
+                </Section>
 
-                        {/* Avg Check */}
-                        <View style={styles.metricCard}>
-                            <View style={styles.metricRow}>
-                                <Text style={styles.metricLabel}>Средний чек</Text>
-                                <View style={[styles.badgePill, { backgroundColor: COLORS.dangerLight }]}>
-                                    <Text style={[styles.badgeText, { color: COLORS.danger }]}>-3%</Text>
-                                </View>
-                            </View>
-                            <View style={styles.valueRow}>
-                                <Text style={styles.metricValue}>{avgCheck > 0 ? formatCurrency(avgCheck).split(' ')[0] : '0'}</Text>
-                                <Text style={styles.metricCurrency}>СУМ</Text>
-                            </View>
-                        </View>
-                    </View>
-
-                    {/* Tip Stats */}
-                    {ownerTipStats && (
-                        <>
-                            <View style={styles.sectionHeaderRow}>
-                                <Text style={styles.sectionTitleDark}>Чаевые</Text>
-                            </View>
-                            <View style={styles.tipStatsContainer}>
-                                <View style={styles.tipStatCard}>
-                                    <Text style={styles.tipStatValue}>{parseFloat(ownerTipStats.total_tips || '0').toLocaleString()}</Text>
-                                    <Text style={styles.tipStatLabel}>Всего чаевых (UZS)</Text>
-                                </View>
-                                <View style={styles.tipStatCard}>
-                                    <Text style={styles.tipStatValue}>{ownerTipStats.total_count || 0}</Text>
-                                    <Text style={styles.tipStatLabel}>Количество</Text>
-                                </View>
-                            </View>
-                            {(ownerTipStats.by_waiter || []).map((w, i) => (
-                                <View key={w.waiter_id || i} style={styles.listCard}>
-                                    <View style={styles.waiterAvatarBG}>
-                                        <MaterialIcons name="person" size={20} color={COLORS.textMuted} />
-                                    </View>
-                                    <View style={styles.listCardContent}>
-                                        <View style={styles.listCardTopRow}>
-                                            <Text style={styles.itemName} numberOfLines={1}>{w.waiter_name || 'Официант'}</Text>
-                                        </View>
-                                        <Text style={styles.itemSubText}>{parseFloat(w.total || '0').toLocaleString()} сум · {w.count} чаевых</Text>
-                                    </View>
+                <Section title="Заказы по часам" icon="bar-chart">
+                    {maxOrders <= 1 ? (
+                        <View style={styles.empty}><Text style={styles.et}>Нет заказов сегодня</Text></View>
+                    ) : (
+                        <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 4, paddingTop: 12, height: 120 }}>
+                            {(analytics?.hourly_breakdown || []).filter(h => Number(h.order_count) > 0).map((h, i) => (
+                                <View key={i} style={{ flex: 1, alignItems: 'center' }}>
+                                    <View style={[styles.bar, { height: Math.max(4, (Number(h.order_count) / maxOrders) * 80), backgroundColor: i % 2 === 0 ? C.primary : C.accent }]} />
+                                    <Text style={styles.bl}>{`${Number(h.hour)}:00`}</Text>
                                 </View>
                             ))}
-                        </>
+                        </View>
                     )}
+                </Section>
 
-                    {/* Service Charge Settings */}
-                    <View style={styles.sectionHeaderRow}>
-                        <Text style={styles.sectionTitleDark}>Сервисный сбор</Text>
-                    </View>
-                    <View style={styles.scCard}>
-                        <Text style={styles.scLabel}>Процент сервисного сбора</Text>
-                        <View style={styles.scRow}>
-                            <TextInput
-                                style={styles.scInput}
-                                keyboardType="numeric"
-                                value={serviceChargeInput}
-                                onChangeText={setServiceChargeInput}
-                                placeholder="0"
-                                placeholderTextColor={COLORS.textMuted}
-                            />
-                            <Text style={styles.scPercentSign}>%</Text>
-                        </View>
-                        <TouchableOpacity
-                            style={[styles.scSaveBtn, savingCharge && { opacity: 0.6 }]}
-                            disabled={savingCharge}
-                            onPress={async () => {
-                                const val = parseInt(serviceChargeInput);
-                                if (isNaN(val) || val < 0 || val > 100) {
-                                    Alert.alert('Ошибка', 'Введите значение от 0 до 100');
-                                    return;
-                                }
-                                setSavingCharge(true);
-                                try {
-                                    await updateServiceCharge(val);
-                                    setServiceCharge(val);
-                                    Alert.alert('Готово', `Сервисный сбор: ${val}%`);
-                                } catch {
-                                    Alert.alert('Ошибка', 'Не удалось сохранить');
-                                } finally {
-                                    setSavingCharge(false);
-                                }
-                            }}
-                        >
-                            {savingCharge ? (
-                                <ActivityIndicator color={COLORS.white} size="small" />
-                            ) : (
-                                <Text style={styles.scSaveBtnText}>Сохранить</Text>
-                            )}
-                        </TouchableOpacity>
-                    </View>
-
-                    {/* Orders by Time (Mock Chart) */}
-                    <View style={styles.sectionHeaderRow}>
-                        <Text style={styles.sectionTitleDark}>Заказы по времени</Text>
-                    </View>
-                    <View style={styles.chartContainer}>
-                        {/* A purely css-based mock curved line using SVG would be best, but we'll use a stylized container for now to avoid breaking without react-native-svg */}
-                        <View style={styles.mockChartArea}>
-                            {/* Decorative curved shape using borders to simulate a line chart peak */}
-                            <View style={styles.mockChartCurveLine} />
-
-                            <View style={styles.chartXAxis}>
-                                <Text style={styles.chartXLabel}>08:00</Text>
-                                <Text style={styles.chartXLabel}>12:00</Text>
-                                <Text style={styles.chartXLabel}>16:00</Text>
-                                <Text style={styles.chartXLabel}>20:00</Text>
-                                <Text style={styles.chartXLabel}>00:00</Text>
-                            </View>
-                        </View>
-                    </View>
-
-                    {/* Most Popular Dishes */}
-                    <View style={styles.sectionHeaderRow}>
-                        <Text style={styles.sectionTitleDark}>Популярные блюда</Text>
-                        <TouchableOpacity onPress={() => navigation.navigate('OwnerMenuTab')}>
-                            <Text style={styles.viewAllText}>Все</Text>
-                        </TouchableOpacity>
-                    </View>
-
-                    {topDishes.map((dish, i) => (
-                        <View key={dish.id || i} style={styles.listCard}>
-                            <Image
-                                source={{ uri: dish.image || 'https://via.placeholder.com/80' }}
-                                style={styles.dishAvatar}
-                            />
-                            <View style={styles.listCardContent}>
-                                <View style={styles.listCardTopRow}>
-                                    <Text style={styles.itemName} numberOfLines={1}>{dish.name || 'Пицца Маргарита'}</Text>
-                                    <View style={styles.valueRow}>
-                                        <Text style={styles.itemRevenue}>{formatCurrency(dish.revenue || 2025000).split(' ')[0]}</Text>
-                                        <Text style={styles.itemCurrencyMini}>СУМ</Text>
-                                    </View>
-                                </View>
-                                <View style={styles.listCardBottomRow}>
-                                    <Text style={styles.itemSubText}>{dish.ordersCount} заказов</Text>
-                                    {/* Progress Bar Mock */}
-                                    <View style={styles.progressBarBG}>
-                                        <View style={[styles.progressBarFill, { width: `${Math.max(20, Math.min(100, dish.ordersCount * 2))}%` }]} />
-                                    </View>
-                                </View>
-                            </View>
-                        </View>
-                    ))}
-
-                    {/* Top Waiters */}
-                    <View style={styles.sectionHeaderRow}>
-                        <Text style={styles.sectionTitleDark}>Лучшие официанты</Text>
-                    </View>
-
-                    {topWaiters.map((waiter, i) => (
-                        <View key={waiter.id || i} style={styles.listCard}>
-                            <View style={styles.waiterAvatarBG}>
-                                <Image
-                                    source={{ uri: `https://i.pravatar.cc/150?u=${waiter.id || i}` }}
-                                    style={styles.waiterAvatar}
-                                />
-                            </View>
-                            <View style={styles.listCardContent}>
-                                <View style={styles.listCardTopRow}>
-                                    <Text style={styles.itemName} numberOfLines={1}>{waiter.full_name || waiter.username || 'Азиз Алиев'}</Text>
-                                    <View style={styles.ratingBadge}>
-                                        <MaterialIcons name="star" size={12} color={COLORS.warning} />
-                                        <Text style={styles.ratingText}>{waiter.rating}</Text>
-                                    </View>
-                                </View>
-                                <View style={styles.listCardBottomRow2}>
-                                    <Text style={styles.itemSubTextDark}>{waiter.ordersCount} <Text style={styles.itemSubText}>заказов</Text></Text>
-                                    <Text style={styles.itemSubTextDark}>{formatCurrency(waiter.revenue).split(' ')[0]} <Text style={styles.itemSubText}>сум</Text></Text>
-                                </View>
-                            </View>
-                        </View>
-                    ))}
-
-                </ScrollView>
-            </Animated.View>
+                <View style={{ padding: 20, alignItems: 'center' }}>
+                    <Text style={{ color: C.muted, fontSize: 11 }}>
+                        {staff.length} сотрудников · {summary?.tables_count || 0} столов
+                    </Text>
+                </View>
+            </ScrollView>
         </SafeAreaView>
     );
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: COLORS.backgroundLight },
-    scrollContent: { paddingBottom: 60 },
-    header: {
-        flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-        paddingHorizontal: 24, paddingTop: 20, paddingBottom: 24,
-    },
-    headerActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-    subscriptionWarning: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 4,
-        backgroundColor: COLORS.danger,
-        borderRadius: 8,
-        paddingHorizontal: 8,
-        paddingVertical: 4,
-    },
-    subscriptionWarningText: { fontSize: 11, fontWeight: '700', color: '#fff' },
-    subscriptionActive: { fontSize: 11, fontWeight: '600', color: COLORS.success },
-    headerTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-    logoIcon: {
-        width: 36, height: 36, backgroundColor: COLORS.primary, borderRadius: 12,
-        justifyContent: 'center', alignItems: 'center'
-    },
-    headerTitle: { fontSize: 20, fontWeight: '800', color: COLORS.textDark },
-    headerSub: { fontSize: 11, fontWeight: '700', color: COLORS.textMuted, letterSpacing: 0.5 },
-    calendarBtn: { padding: 4 },
-
-    sectionHeaderRow: {
-        flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-        paddingHorizontal: 24, paddingBottom: 16, marginTop: 8
-    },
-    sectionTitle: { fontSize: 13, fontWeight: '700', color: COLORS.textMuted, letterSpacing: 1, textTransform: 'uppercase' },
-    sectionTitleDark: { fontSize: 18, fontWeight: '800', color: COLORS.textDark },
-    dropdownBtn: {
-        flexDirection: 'row', alignItems: 'center', gap: 4,
-        backgroundColor: COLORS.white, paddingHorizontal: 12, paddingVertical: 6,
-        borderRadius: 20, borderWidth: 1, borderColor: COLORS.slate100
-    },
-    dropdownText: { fontSize: 13, fontWeight: '600', color: COLORS.textDark },
-    viewAllText: { fontSize: 14, fontWeight: '600', color: COLORS.primary },
-
-    metricsContainer: { paddingHorizontal: 24, gap: 16, marginBottom: 24 },
-    metricCard: {
-        backgroundColor: COLORS.white, borderRadius: 24, padding: 24,
-        shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.03, shadowRadius: 16, elevation: 2,
-    },
-    metricRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
-    metricLabel: { fontSize: 15, fontWeight: '600', color: COLORS.textMuted },
-    badgePill: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
-    badgeText: { fontSize: 12, fontWeight: '800' },
-    valueRow: { flexDirection: 'row', alignItems: 'baseline', gap: 6 },
-    metricValue: { fontSize: 32, fontWeight: '800', color: COLORS.textDark, letterSpacing: -0.5 },
-    metricCurrency: { fontSize: 14, fontWeight: '700', color: COLORS.textMuted },
-
-    chartContainer: { paddingHorizontal: 24, marginBottom: 32 },
-    mockChartArea: {
-        height: 180, backgroundColor: COLORS.white, borderRadius: 24, padding: 20,
-        shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.03, shadowRadius: 16, elevation: 2,
-        justifyContent: 'flex-end', overflow: 'hidden'
-    },
-    mockChartCurveLine: {
-        position: 'absolute', bottom: -100, left: -50, width: '150%', height: 250,
-        borderTopWidth: 2, borderTopColor: COLORS.primary, borderTopLeftRadius: 200, borderTopRightRadius: 200,
-        backgroundColor: COLORS.primaryLight + '20'
-    },
-    chartXAxis: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 16, zIndex: 10 },
-    chartXLabel: { fontSize: 10, color: COLORS.textMuted, fontWeight: '600' },
-
-    listCard: {
-        flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.white,
-        borderRadius: 24, padding: 16, marginHorizontal: 24, marginBottom: 12,
-        shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.03, shadowRadius: 16, elevation: 2,
-    },
-    dishAvatar: { width: 48, height: 48, borderRadius: 24, backgroundColor: COLORS.slate100 },
-    listCardContent: { flex: 1, marginLeft: 16, justifyContent: 'center' },
-    listCardTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
-    itemName: { fontSize: 16, fontWeight: '800', color: COLORS.textDark, flex: 1 },
-    itemRevenue: { fontSize: 16, fontWeight: '800', color: COLORS.textDark },
-    itemCurrencyMini: { fontSize: 10, fontWeight: '700', color: COLORS.textMuted },
-    listCardBottomRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-    itemSubText: { fontSize: 13, color: COLORS.textMuted, fontWeight: '500' },
-    itemSubTextDark: { fontSize: 13, color: COLORS.textDark, fontWeight: '700' },
-    listCardBottomRow2: { flexDirection: 'row', gap: 16 },
-    progressBarBG: { flex: 1, height: 6, backgroundColor: COLORS.slate100, borderRadius: 3 },
-    progressBarFill: { height: 6, backgroundColor: COLORS.primary, borderRadius: 3 },
-
-    waiterAvatarBG: { width: 48, height: 48, borderRadius: 24, backgroundColor: COLORS.warningLight, overflow: 'hidden' },
-    waiterAvatar: { width: '100%', height: '100%' },
-    ratingBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: COLORS.warningLight, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
-    ratingText: { fontSize: 12, fontWeight: '800', color: COLORS.warning },
-    tipStatsContainer: {
-        flexDirection: 'row',
-        gap: 12,
-        paddingHorizontal: 24,
-        marginBottom: 16,
-    },
-    tipStatCard: {
-        flex: 1,
-        backgroundColor: COLORS.white,
-        borderRadius: 16,
-        padding: 16,
-        alignItems: 'center',
-        shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.03, shadowRadius: 12, elevation: 2,
-    },
-    tipStatValue: {
-        fontSize: 22,
-        fontWeight: '800',
-        color: COLORS.textDark,
-    },
-    tipStatLabel: {
-        fontSize: 12,
-        color: COLORS.textMuted,
-        fontWeight: '600',
-        marginTop: 4,
-    },
-    scCard: {
-        backgroundColor: COLORS.white,
-        borderRadius: 24,
-        padding: 20,
-        marginHorizontal: 24,
-        marginBottom: 24,
-        shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.03, shadowRadius: 16, elevation: 2,
-    },
-    scLabel: {
-        fontSize: 14,
-        fontWeight: '600',
-        color: COLORS.textMuted,
-        marginBottom: 8,
-    },
-    scRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 8,
-        marginBottom: 12,
-    },
-    scInput: {
-        flex: 1,
-        backgroundColor: COLORS.slate100,
-        borderRadius: 12,
-        paddingHorizontal: 16,
-        paddingVertical: 12,
-        fontSize: 18,
-        fontWeight: '700',
-        color: COLORS.textDark,
-    },
-    scPercentSign: {
-        fontSize: 18,
-        fontWeight: '700',
-        color: COLORS.textMuted,
-    },
-    scSaveBtn: {
-        backgroundColor: COLORS.primary,
-        borderRadius: 14,
-        paddingVertical: 14,
-        alignItems: 'center',
-    },
-    scSaveBtnText: {
-        color: COLORS.white,
-        fontSize: 16,
-        fontWeight: '700',
-    },
+    container: { flex: 1, backgroundColor: C.bg },
+    center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: C.bg },
+    header: { paddingHorizontal: 20, paddingVertical: 18, flexDirection: 'row', justifyContent: 'space-between', backgroundColor: C.card, borderBottomWidth: 1, borderBottomColor: C.border },
+    kicker: { color: '#8bd8ff', fontSize: 10, fontWeight: '900', letterSpacing: 3, textTransform: 'uppercase' },
+    title: { color: C.text, fontSize: 34, fontWeight: '900', letterSpacing: -1 },
+    sub: { color: C.muted, fontSize: 13, marginTop: 2 },
+    hBtn: { padding: 8, borderRadius: 999, backgroundColor: C.bg },
+    metric: { width: 140, backgroundColor: C.card, borderWidth: 1, borderColor: C.border, borderRadius: 20, padding: 14 },
+    metricL: { color: C.muted, fontSize: 10, fontWeight: '700' },
+    metricV: { color: C.text, fontSize: 24, fontWeight: '900', marginTop: 6 },
+    section: { marginHorizontal: 16, marginTop: 16, backgroundColor: C.card, borderWidth: 1, borderColor: C.border, borderRadius: 24, padding: 16 },
+    sh: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 },
+    st: { color: C.text, fontSize: 16, fontWeight: '900' },
+    sc: { color: C.muted, fontSize: 11, fontWeight: '700', backgroundColor: C.bg, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 999 },
+    link: { color: C.accent, fontSize: 12, fontWeight: '800' },
+    empty: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 20 },
+    et: { color: C.muted, fontSize: 13 },
+    row: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8, borderTopWidth: 1, borderTopColor: C.border },
+    rb: { width: 24, height: 24, borderRadius: 12, backgroundColor: C.primarySoft, alignItems: 'center', justifyContent: 'center' },
+    rt: { color: C.primary, fontSize: 11, fontWeight: '900' },
+    rn: { color: C.text, fontSize: 14, fontWeight: '700' },
+    rs: { color: C.muted, fontSize: 10, marginTop: 1 },
+    rv: { color: C.text, fontSize: 15, fontWeight: '900', marginLeft: 8 },
+    bar: { width: '100%', borderRadius: 4, minWidth: 6 },
+    bl: { color: C.muted, fontSize: 7, marginTop: 2 },
 });

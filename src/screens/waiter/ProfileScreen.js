@@ -7,15 +7,20 @@ import {
     ScrollView,
     Animated,
     Alert,
+    Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
-import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '../../context/AuthContext';
 import { useNotifications } from '../../context/NotificationsContext';
 import { useKitchen } from '../../context/KitchenContext';
-import { getMe, uploadPhoto } from '../../api/apiService';
+import { getMe } from '../../api/apiService';
 import UserAvatar from '../../components/common/UserAvatar';
+import {
+    AVATAR_PRESETS,
+    loadStoredAvatarPreset,
+    saveStoredAvatarPreset,
+} from '../../utils/avatar';
 
 const COLORS = {
     primary: '#ff6b6b',
@@ -40,10 +45,12 @@ const ROLE_LABELS = {
 };
 
 export default function ProfileScreen({ navigation }) {
-    const { user, logout, refreshUser } = useAuth();
+    const { user, logout } = useAuth();
     const { unreadCount } = useNotifications();
     const kitchen = useKitchen();
     const [profile, setProfile] = useState(null);
+    const [avatarPresetId, setAvatarPresetId] = useState(null);
+    const [avatarModalVisible, setAvatarModalVisible] = useState(false);
     const fadeAnim = useRef(new Animated.Value(0)).current;
 
     useEffect(() => {
@@ -53,6 +60,7 @@ export default function ProfileScreen({ navigation }) {
             useNativeDriver: true,
         }).start();
         fetchProfile();
+        loadStoredAvatarPreset().then(setAvatarPresetId).catch(() => {});
     }, []);
 
     const fetchProfile = async () => {
@@ -62,57 +70,6 @@ export default function ProfileScreen({ navigation }) {
         } catch (e) {
             console.log('Profile fetch failed:', e.message);
         }
-    };
-
-    const pickPhoto = async () => {
-        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-        if (status !== 'granted') {
-            Alert.alert('Доступ запрещён', 'Разрешите доступ к галерее в настройках');
-            return;
-        }
-        const result = await ImagePicker.launchImageLibraryAsync({
-            mediaTypes: ImagePicker.MediaTypeOptions.Images,
-            allowsEditing: true,
-            aspect: [1, 1],
-            quality: 0.6,
-        });
-        if (!result.canceled && result.assets?.length) {
-            await handlePhotoUpload(result.assets[0].uri);
-        }
-    };
-
-    const takePhoto = async () => {
-        const { status } = await ImagePicker.requestCameraPermissionsAsync();
-        if (status !== 'granted') {
-            Alert.alert('Доступ запрещён', 'Разрешите доступ к камере в настройках');
-            return;
-        }
-        const result = await ImagePicker.launchCameraAsync({
-            allowsEditing: true,
-            aspect: [1, 1],
-            quality: 0.6,
-        });
-        if (!result.canceled && result.assets?.length) {
-            await handlePhotoUpload(result.assets[0].uri);
-        }
-    };
-
-    const handlePhotoUpload = async (uri) => {
-        try {
-            await uploadPhoto(uri);
-            await refreshUser();
-            await fetchProfile();
-        } catch (e) {
-            Alert.alert('Ошибка', 'Не удалось загрузить фото');
-        }
-    };
-
-    const showPhotoPicker = () => {
-        Alert.alert('Фото профиля', 'Выберите источник', [
-            { text: 'Камера', onPress: takePhoto },
-            { text: 'Галерея', onPress: pickPhoto },
-            { text: 'Отмена', style: 'cancel' },
-        ]);
     };
 
     const displayUser = profile || user || {};
@@ -144,6 +101,30 @@ export default function ProfileScreen({ navigation }) {
         );
     };
 
+    const handleDeleteAccount = () => {
+        Alert.alert(
+            'Удаление аккаунта',
+            'Вы уверены? Это действие необратимо. Ваш аккаунт будет деактивирован.',
+            [
+                { text: 'Отмена', style: 'cancel' },
+                {
+                    text: 'Удалить',
+                    style: 'destructive',
+                    onPress: async () => {
+                        try {
+                            const client = require('../../api/client').default;
+                            await client.post('/auth/delete-account/');
+                            Alert.alert('Аккаунт удалён', 'Вы будете перенаправлены на экран входа.');
+                            logout();
+                        } catch (e) {
+                            Alert.alert('Ошибка', 'Не удалось удалить аккаунт. Попробуйте позже.');
+                        }
+                    },
+                },
+            ]
+        );
+    };
+
     const formatDate = (dateString) => {
         if (!dateString) return '';
         const date = new Date(dateString);
@@ -158,6 +139,12 @@ export default function ProfileScreen({ navigation }) {
         if (item.screen) {
             navigation.navigate(item.screen);
         }
+    };
+
+    const handleAvatarSelect = async (avatarId) => {
+        await saveStoredAvatarPreset(avatarId);
+        setAvatarPresetId(avatarId);
+        setAvatarModalVisible(false);
     };
 
     return (
@@ -175,13 +162,13 @@ export default function ProfileScreen({ navigation }) {
                 <Animated.View style={[styles.avatarSection, { opacity: fadeAnim }]}>
                     <TouchableOpacity
                         activeOpacity={0.85}
-                        onPress={showPhotoPicker}
+                        onPress={() => setAvatarModalVisible(true)}
                         style={styles.avatarButton}
                     >
                         <View style={styles.avatarCircle}>
                             <UserAvatar
                                 fullName={displayUser.full_name}
-                                photoUrl={displayUser.photo_url}
+                                avatarPresetId={avatarPresetId}
                                 size={88}
                                 fallbackBackgroundColor={COLORS.primary}
                                 fallbackTextColor={COLORS.white}
@@ -206,7 +193,7 @@ export default function ProfileScreen({ navigation }) {
                 </Animated.View>
 
                 <Animated.View style={[styles.avatarHintWrap, { opacity: fadeAnim }]}>
-                    <Text style={styles.avatarHintText}>Нажмите на аватар, чтобы загрузить фото</Text>
+                    <Text style={styles.avatarHintText}>Нажмите на аватар, чтобы выбрать стиль</Text>
                 </Animated.View>
 
                 {/* Menu */}
@@ -244,8 +231,55 @@ export default function ProfileScreen({ navigation }) {
                         <MaterialIcons name="logout" size={20} color="#EE5A6F" />
                         <Text style={styles.logoutText}>Выйти из аккаунта</Text>
                     </TouchableOpacity>
+                    <TouchableOpacity
+                        style={[styles.logoutBtn, { marginTop: 12, borderColor: '#EE5A6F40' }]}
+                        activeOpacity={0.7}
+                        onPress={handleDeleteAccount}
+                    >
+                        <MaterialIcons name="delete-forever" size={20} color="#EE5A6F" />
+                        <Text style={styles.logoutText}>Удалить аккаунт</Text>
+                    </TouchableOpacity>
                 </Animated.View>
             </ScrollView>
+
+            <Modal
+                visible={avatarModalVisible}
+                transparent
+                animationType="fade"
+                onRequestClose={() => setAvatarModalVisible(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalCard}>
+                        <Text style={styles.modalTitle}>Выберите аватар</Text>
+                        <View style={styles.avatarGrid}>
+                            {AVATAR_PRESETS.map((preset) => {
+                                const isActive = avatarPresetId === preset.id;
+                                return (
+                                    <TouchableOpacity
+                                        key={preset.id}
+                                        style={[styles.avatarOption, isActive && styles.avatarOptionActive]}
+                                        onPress={() => handleAvatarSelect(preset.id)}
+                                    >
+                                        <UserAvatar
+                                            fullName={displayUser.full_name}
+                                            avatarPresetId={preset.id}
+                                            size={54}
+                                            fallbackBackgroundColor={COLORS.primary}
+                                            fallbackTextColor={COLORS.white}
+                                        />
+                                    </TouchableOpacity>
+                                );
+                            })}
+                        </View>
+                        <TouchableOpacity style={styles.initialsBtn} onPress={() => handleAvatarSelect(null)}>
+                            <Text style={styles.initialsBtnText}>Сбросить на инициалы</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={styles.closeBtn} onPress={() => setAvatarModalVisible(false)}>
+                            <Text style={styles.closeBtnText}>Готово</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </Modal>
         </SafeAreaView>
     );
 }

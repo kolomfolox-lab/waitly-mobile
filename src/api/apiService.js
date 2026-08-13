@@ -90,7 +90,6 @@ export const createOrder = async (tableId, items) => {
             items: items.map((item) => ({
                 dish: item.dish || item.dish_id,
                 quantity: Number(item.quantity),
-                comment: item.notes || '',
                 seat_number: item.seat_number,
                 guest_label: item.guest_label,
             })),
@@ -100,7 +99,6 @@ export const createOrder = async (tableId, items) => {
             items: items.map((item) => ({
                 dish_id: item.dish || item.dish_id,
                 quantity: Number(item.quantity),
-                comment: item.notes || '',
                 seat_number: item.seat_number,
                 guest_label: item.guest_label,
             })),
@@ -110,7 +108,6 @@ export const createOrder = async (tableId, items) => {
             items: items.map((item) => ({
                 dish: item.dish || item.dish_id,
                 quantity: Number(item.quantity),
-                comment: item.notes || '',
                 seat_number: item.seat_number,
                 guest_label: item.guest_label,
             })),
@@ -120,7 +117,6 @@ export const createOrder = async (tableId, items) => {
             items: items.map((item) => ({
                 dish_id: item.dish || item.dish_id,
                 quantity: Number(item.quantity),
-                comment: item.notes || '',
                 seat_number: item.seat_number,
                 guest_label: item.guest_label,
             })),
@@ -186,16 +182,6 @@ export const deliverOrder = async (orderId) => {
 
 export const cancelOrder = async (orderId, payload = {}) => {
     const response = await apiClient.post(`/api/orders/orders/${orderId}/cancel/`, payload);
-    return response.data;
-};
-
-export const requestBill = async (orderId) => {
-    const response = await apiClient.post(`/api/orders/orders/${orderId}/request_bill/`);
-    return response.data;
-};
-
-export const markPaid = async (orderId) => {
-    const response = await apiClient.post(`/api/orders/orders/${orderId}/mark_paid/`);
     return response.data;
 };
 
@@ -338,97 +324,54 @@ export const deleteTable = async (tableId) => {
 };
 
 // =====================
-// Auth (v1)
+// Owner — Dashboard (v1 APIs)
 // =====================
 
-export const validateInvite = async (code) => {
-    const response = await apiClient.post('/api/v1/auth/validate-invite/', { code });
+export const getOwnerDashboardSummary = async (restaurantId) => {
+    const params = restaurantId ? { restaurant_id: restaurantId } : {};
+    const response = await apiClient.get('/api/v1/owner/dashboard/summary/', { params });
     return response.data;
 };
 
-export const authRegister = async ({ invite_code, phone_number, password, full_name }) => {
-    const response = await apiClient.post('/api/v1/auth/register/', {
-        invite_code, phone_number, password, full_name,
+export const getOwnerStaffPerformance = async (restaurantId) => {
+    const params = restaurantId ? { restaurant_id: restaurantId } : {};
+    const response = await apiClient.get('/api/v1/owner/dashboard/staff-performance/', { params });
+    return response.data;
+};
+
+export const getOwnerDashboardAnalytics = async (restaurantId) => {
+    const params = restaurantId ? { restaurant_id: restaurantId } : {};
+    const response = await apiClient.get('/api/v1/owner/dashboard/analytics/', { params });
+    return response.data;
+};
+
+export const getMobileInventorySummary = async () => {
+    const response = await apiClient.get('/api/v1/mobile/inventory/summary/');
+    return response.data;
+};
+
+// =====================
+// Owner — AI Agent
+// =====================
+
+export const aiChat = async ({ message, history = [], restaurant_id } = {}) => {
+    const response = await apiClient.post('/api/owner/ai/chat/', {
+        message,
+        history,
+        ...(restaurant_id ? { restaurant_id } : {}),
     });
     return response.data;
 };
 
-// =====================
-// Guest - Savings Goal
-// =====================
-
-export const getSavingsGoal = async () => {
-    const response = await apiClient.get('/api/v1/guest/savings/goal/');
-    return response.data;
-};
-
-export const updateSavingsGoal = async (data) => {
-    const response = await apiClient.put('/api/v1/guest/savings/goal/', data);
-    return response.data;
-};
-
-export const contributeToSavings = async (amount) => {
-    const response = await apiClient.post('/api/v1/guest/savings/contribute/', { amount });
-    return response.data;
-};
-
-// =====================
-// Guest - Tips
-// =====================
-
-export const createTip = async ({ waiter_id, amount }) => {
-    const response = await apiClient.post('/api/v1/guest/tips/create/', { waiter_id, amount });
-    return response.data;
-};
-
-// =====================
-// Mobile - Tip Stats (Waiter)
-// =====================
-
-export const getWaiterTipStats = async () => {
-    const response = await apiClient.get('/api/v1/mobile/tips/stats/');
-    return response.data;
-};
-
-// =====================
-// Owner - Tip Stats & Service Charge
-// =====================
-
-export const getOwnerTipStats = async () => {
-    const response = await apiClient.get('/api/v1/owner/tips/stats/');
-    return response.data;
-};
-
-export const getServiceCharge = async () => {
-    const response = await apiClient.get('/api/v1/owner/restaurants/service-charge/');
-    return response.data;
-};
-
-export const updateServiceCharge = async (percent) => {
-    const response = await apiClient.put('/api/v1/owner/restaurants/service-charge/', { percent });
-    return response.data;
-};
-
-export const registerPushToken = async (pushToken, platform) => {
-    const response = await apiClient.post('/api/v1/mobile/devices/register/', {
-        push_token: pushToken,
-        platform: platform,
-        app_version: '1.4.0',
+export const aiConfirmAction = async (pendingActionId, confirm) => {
+    const response = await apiClient.post('/api/owner/ai/confirm/', {
+        pending_action_id: pendingActionId,
+        confirm,
     });
     return response.data;
 };
 
-export const uploadPhoto = async (photoUri) => {
-    const formData = new FormData();
-    const filename = photoUri.split('/').pop();
-    const ext = filename.split('.').pop();
-    formData.append('photo', {
-        uri: photoUri,
-        name: filename,
-        type: `image/${ext === 'png' ? 'png' : 'jpeg'}`,
-    });
-    const response = await apiClient.post('/api/v1/auth/upload-photo/', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-    });
+export const aiPendingActions = async () => {
+    const response = await apiClient.get('/api/owner/ai/pending/');
     return response.data;
 };

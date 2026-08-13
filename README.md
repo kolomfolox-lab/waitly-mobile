@@ -22,6 +22,8 @@ npm run ios
 npm run web
 ```
 
+Production preview: https://waitly-final-live.vercel.app
+
 ## Production API
 
 The app points to:
@@ -45,6 +47,28 @@ services/api.js
 Both clients refresh JWT tokens and clear local auth on 403.
 
 See `MOBILE_APP_GUIDE.md` for complete documentation.
+
+## Guest Telegram Web App
+
+The web build opens the guest-facing Waitly experience: restaurant discovery, table reservations, QR table context, kitchen ETA, table menu, orders, profile, RU/UZ/EN switching, and a Payme tokenization demo.
+
+```bash
+npm run web
+```
+
+Table deep links are supported with `?table=14`, `?startapp=table_14`, `#table_14`, or Telegram `initDataUnsafe.start_param`. Payme is intentionally represented by a secure iFrame integration boundary until merchant API credentials are available; the demo stores only a masked card reference and never accepts raw card details.
+
+The backend catalog can be populated idempotently with:
+
+```bash
+docker compose exec web python manage.py seed_guest_demo
+```
+
+Telegram registration uses signed `initData` plus the guest phone number. A user becomes `Verified member` only after an active Payme token exists. Register the bot webhook only after setting rotated secrets in the backend environment:
+
+```bash
+docker compose exec web python manage.py set_telegram_webhook
+```
 
 ## Roles
 

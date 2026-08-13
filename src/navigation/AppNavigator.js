@@ -10,10 +10,11 @@ import { useTranslation } from 'react-i18next';
 
 import { useAuth } from '../context/AuthContext';
 import { KitchenProvider } from '../context/KitchenContext';
+import { useTelegram } from '../telegram/TelegramProvider';
+import GuestWebApp from '../screens/guest/GuestWebApp';
+
+const Stack = createStackNavigator();
 import LoginScreen from '../screens/common/LoginScreen';
-import AuthScreen from '../screens/common/AuthScreen';
-import RegisterScreen from '../screens/common/RegisterScreen';
-import LoginTelegramScreen from '../screens/common/LoginTelegramScreen';
 import LinkPhoneScreen from '../screens/common/LinkPhoneScreen';
 import SubscriptionExpiredScreen from '../screens/common/SubscriptionExpiredScreen';
 import UnauthorizedRoleScreen from '../screens/common/UnauthorizedRoleScreen';
@@ -21,11 +22,9 @@ import UnauthorizedRoleScreen from '../screens/common/UnauthorizedRoleScreen';
 // Waiter
 import WaiterDashboard from '../screens/waiter/WaiterDashboard';
 import WaiterTables from '../screens/waiter/WaiterTables';
-import WaiterTipsScreen from '../screens/waiter/WaiterTipsScreen';
 import OrdersListScreen from '../screens/waiter/OrdersListScreen';
 import OrderCreationScreen from '../screens/waiter/OrderCreationScreen';
 import OrderConfirmationScreen from '../screens/waiter/OrderConfirmationScreen';
-import OrderModifyScreen from '../screens/waiter/OrderModifyScreen';
 import ProfileScreen from '../screens/waiter/ProfileScreen';
 import NotificationsScreen from '../screens/waiter/NotificationsScreen';
 import LanguageScreen from '../screens/waiter/LanguageScreen';
@@ -35,7 +34,6 @@ import { useNotifications } from '../context/NotificationsContext';
 
 // Kitchen
 import KitchenDashboard from '../screens/kitchen/KitchenDashboard';
-import ChefDashboard from '../screens/chef/ChefDashboard';
 import AssignedOrdersScreen from '../screens/kitchen/AssignedOrdersScreen';
 import AvailableOrdersScreen from '../screens/kitchen/AvailableOrdersScreen';
 import KitchenOrderDetailsScreen from '../screens/kitchen/KitchenOrderDetailsScreen';
@@ -44,13 +42,12 @@ import KitchenAvailabilityScreen from '../screens/kitchen/KitchenAvailabilityScr
 import KitchenUpdatesScreen from '../screens/kitchen/KitchenUpdatesScreen';
 import MenuManagementScreen from '../screens/kitchen/MenuManagementScreen';
 
-// Head Waiter
-import HeadWaiterDashboard from '../screens/head_waiter/HeadWaiterDashboard';
-import StaffManagementScreen from '../screens/head_waiter/StaffManagementScreen';
-
 // Bartender
 import BarDashboard from '../screens/bartender/BarDashboard';
 import BarOrderDetailsScreen from '../screens/bartender/BarOrderDetailsScreen';
+
+// Barista
+import BaristaDashboard from '../screens/barista/BaristaDashboard';
 
 // Courier
 import CourierDashboard from '../screens/courier/CourierDashboard';
@@ -60,45 +57,12 @@ import CourierOrderDetailsScreen from '../screens/courier/CourierOrderDetailsScr
 import OwnerDashboard from '../screens/owner/OwnerDashboard';
 import StaffScreen from '../screens/owner/StaffScreen';
 import OwnerMenuScreen from '../screens/owner/OwnerMenuScreen';
+import OwnerAIChatScreen from '../screens/owner/OwnerAIChatScreen';
 import InventoryScreen from '../screens/InventoryScreen';
 
-// Shift Leader
-import ShiftLeaderDashboard from '../screens/shiftleader/ShiftLeaderDashboard';
-
-// Dispatcher
-import DispatcherDashboard from '../screens/dispatcher/DispatcherDashboard';
-
-// Accountant
-import AccountantDashboard from '../screens/accountant/AccountantDashboard';
-
-// Marketer
-import MarketerDashboard from '../screens/marketer/MarketerDashboard';
-
-// Analyst
-import AnalystDashboard from '../screens/analyst/AnalystDashboard';
-
-// Support
-import SupportDashboard from '../screens/support/SupportDashboard';
-
-// Auditor
-import AuditorDashboard from '../screens/auditor/AuditorDashboard';
-
-// Supplier
-import SupplierDashboard from '../screens/supplier/SupplierDashboard';
-
-// Guest
-import GuestScannerScreen from '../screens/guest/GuestScannerScreen';
-import GuestMenuScreen from '../screens/guest/GuestMenuScreen';
-import GuestCartScreen from '../screens/guest/GuestCartScreen';
-import GuestOrderTrackingScreen from '../screens/guest/GuestOrderTrackingScreen';
-import GuestPaymentScreen from '../screens/guest/GuestPaymentScreen';
-import GuestProfileScreen from '../screens/guest/GuestProfileScreen';
-import GuestSavingsGoalScreen from '../screens/guest/GuestSavingsGoalScreen';
-
-// Guest Cart
-import { CartProvider } from '../context/CartContext';
-
-const Stack = createStackNavigator();
+// Chef
+import ChefDashboard from '../screens/chef/ChefDashboard';
+import ChecklistScreen from '../screens/chef/ChecklistScreen';
 const Tab = createBottomTabNavigator();
 
 const COLORS = {
@@ -194,7 +158,6 @@ function WaiterDashboardStack() {
         <Stack.Navigator screenOptions={{ headerShown: false }}>
             <Stack.Screen name="DashboardHome" component={WaiterDashboard} />
             <Stack.Screen name="OrderCreation" component={OrderCreationScreen} />
-            <Stack.Screen name="OrderModify" component={OrderModifyScreen} />
             <Stack.Screen name="OrderConfirmation" component={OrderConfirmationScreen} options={{ gestureEnabled: false }} />
         </Stack.Navigator>
     );
@@ -205,7 +168,6 @@ function WaiterTablesStack() {
         <Stack.Navigator screenOptions={{ headerShown: false }}>
             <Stack.Screen name="TablesHome" component={WaiterTables} />
             <Stack.Screen name="OrderCreation" component={OrderCreationScreen} />
-            <Stack.Screen name="OrderModify" component={OrderModifyScreen} />
             <Stack.Screen name="OrderConfirmation" component={OrderConfirmationScreen} options={{ gestureEnabled: false }} />
         </Stack.Navigator>
     );
@@ -241,6 +203,8 @@ function KitchenQueueStack() {
             <Stack.Screen name="KitchenAvailability" component={KitchenAvailabilityScreen} />
             <Stack.Screen name="KitchenUpdates" component={KitchenUpdatesScreen} />
             <Stack.Screen name="KitchenMenuManagement" component={MenuManagementScreen} />
+            <Stack.Screen name="ChefDashboard" component={ChefDashboard} />
+            <Stack.Screen name="ChecklistScreen" component={ChecklistScreen} />
         </Stack.Navigator>
     );
 }
@@ -289,14 +253,12 @@ function WaiterTabs() {
                 HomeTab: 'home',
                 TablesTab: 'table-restaurant',
                 OrdersTab: 'receipt-long',
-                TipsTab: 'monetization-on',
                 ProfileTab: 'person',
             })}
         >
             <Tab.Screen name="HomeTab" component={WaiterDashboardStack} options={{ tabBarLabel: t('tab_home') }} />
             <Tab.Screen name="TablesTab" component={WaiterTablesStack} options={{ tabBarLabel: t('tab_tables') }} />
             <Tab.Screen name="OrdersTab" component={WaiterOrdersStack} options={{ tabBarLabel: t('tab_orders') }} />
-            <Tab.Screen name="TipsTab" component={WaiterTipsScreen} options={{ tabBarLabel: 'Чаевые' }} />
             <Tab.Screen
                 name="ProfileTab"
                 component={ProfileStack}
@@ -310,56 +272,17 @@ function WaiterTabs() {
     );
 }
 
-function HeadWaiterDashboardStack() {
+function ChecklistStack() {
     return (
         <Stack.Navigator screenOptions={{ headerShown: false }}>
-            <Stack.Screen name="HeadWaiterHome" component={HeadWaiterDashboard} />
-            <Stack.Screen name="OrderCreation" component={OrderCreationScreen} />
-            <Stack.Screen name="OrderConfirmation" component={OrderConfirmationScreen} options={{ gestureEnabled: false }} />
+            <Stack.Screen name="ChecklistHome" component={ChecklistScreen} />
         </Stack.Navigator>
-    );
-}
-
-function HeadWaiterStaffStack() {
-    return (
-        <Stack.Navigator screenOptions={{ headerShown: false }}>
-            <Stack.Screen name="StaffManageHome" component={StaffManagementScreen} />
-        </Stack.Navigator>
-    );
-}
-
-function HeadWaiterTabs() {
-    const { unreadCount } = useNotifications();
-    const { t } = useTranslation();
-
-    return (
-        <Tab.Navigator
-            screenOptions={buildTabScreenOptions({
-                HomeTab: 'assignment-turned-in',
-                StaffTab: 'people',
-                OrdersTab: 'receipt-long',
-                ProfileTab: 'person',
-            })}
-        >
-            <Tab.Screen name="HomeTab" component={HeadWaiterDashboardStack} options={{ tabBarLabel: 'Смена' }} />
-            <Tab.Screen name="StaffTab" component={HeadWaiterStaffStack} options={{ tabBarLabel: 'Персонал' }} />
-            <Tab.Screen name="OrdersTab" component={WaiterOrdersStack} options={{ tabBarLabel: t('tab_orders') }} />
-            <Tab.Screen
-                name="ProfileTab"
-                component={ProfileStack}
-                options={{
-                    tabBarLabel: t('tab_profile'),
-                    tabBarBadge: unreadCount > 0 ? unreadCount : undefined,
-                    tabBarBadgeStyle: { backgroundColor: COLORS.primary, color: COLORS.white },
-                }}
-            />
-        </Tab.Navigator>
     );
 }
 
 function KitchenTabsInner() {
     const { user } = useAuth();
-    const isChefOrHeadChef = user?.role === 'CHEF' || user?.role === 'HEAD_CHEF';
+    const isChef = user?.role === 'CHEF';
     const { t } = useTranslation();
 
     return (
@@ -368,6 +291,7 @@ function KitchenTabsInner() {
                 QueueTab: 'outdoor-grill',
                 AssignedTab: 'assignment-ind',
                 AvailableTab: 'playlist-add-check',
+                ChecklistTab: 'checklist',
                 MenuTab: 'restaurant-menu',
                 ProfileTab: 'person',
             })}
@@ -375,7 +299,8 @@ function KitchenTabsInner() {
             <Tab.Screen name="QueueTab" component={KitchenQueueStack} options={{ tabBarLabel: t('tab_queue') }} />
             <Tab.Screen name="AssignedTab" component={AssignedOrdersStack} options={{ tabBarLabel: t('tab_assigned') }} />
             <Tab.Screen name="AvailableTab" component={AvailableOrdersStack} options={{ tabBarLabel: t('tab_available') }} />
-            {isChefOrHeadChef ? (
+            <Tab.Screen name="ChecklistTab" component={ChecklistStack} options={{ tabBarLabel: 'Чек-листы' }} />
+            {isChef ? (
                 <Tab.Screen name="MenuTab" component={ChefMenuStack} options={{ tabBarLabel: t('tab_menu') }} />
             ) : null}
             <Tab.Screen name="ProfileTab" component={ProfileStack} options={{ tabBarLabel: t('tab_profile') }} />
@@ -442,7 +367,30 @@ function CourierTabs() {
                 ProfileTab: 'person',
             })}
         >
-            <Tab.Screen name="DeliveriesTab" component={CourierDeliveryStack} options={{ tabBarLabel: 'Доставки' }} />
+            <Tab.Screen name="DeliveriesTab" component={CourierDeliveryStack} options={{ tabBarLabel: 'Deliveries' }} />
+            <Tab.Screen name="ProfileTab" component={ProfileStack} options={{ tabBarLabel: t('tab_profile') }} />
+        </Tab.Navigator>
+    );
+}
+
+function BaristaCoffeeStack() {
+    return (
+        <Stack.Navigator screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="BaristaHome" component={BaristaDashboard} />
+        </Stack.Navigator>
+    );
+}
+
+function BaristaTabs() {
+    const { t } = useTranslation();
+    return (
+        <Tab.Navigator
+            screenOptions={buildTabScreenOptions({
+                OrdersTab: 'coffee',
+                ProfileTab: 'person',
+            })}
+        >
+            <Tab.Screen name="OrdersTab" component={BaristaCoffeeStack} options={{ tabBarLabel: '☕ Заказы' }} />
             <Tab.Screen name="ProfileTab" component={ProfileStack} options={{ tabBarLabel: t('tab_profile') }} />
         </Tab.Navigator>
     );
@@ -456,126 +404,17 @@ function OwnerTabs() {
                 StaffTab: 'people',
                 OwnerMenuTab: 'restaurant-menu',
                 InventoryTab: 'inventory',
+                AiTab: 'auto-awesome',
                 ProfileTab: 'person',
             })}
         >
-            <Tab.Screen name="StatsTab" component={OwnerDashboard} options={{ tabBarLabel: 'Статистика' }} />
+            <Tab.Screen name="StatsTab" component={OwnerDashboard} options={{ tabBarLabel: 'Кабинет' }} />
+            <Tab.Screen name="AiTab" component={OwnerAIChatScreen} options={{ tabBarLabel: 'AI' }} />
             <Tab.Screen name="StaffTab" component={StaffScreen} options={{ tabBarLabel: 'Персонал' }} />
             <Tab.Screen name="OwnerMenuTab" component={OwnerMenuScreen} options={{ tabBarLabel: 'Меню' }} />
             <Tab.Screen name="ProfileTab" component={ProfileStack} options={{ tabBarLabel: 'Профиль' }} />
             <Tab.Screen name="InventoryTab" component={InventoryScreen} options={{ tabBarLabel: 'Склад' }} />
         </Tab.Navigator>
-    );
-}
-
-function SingleTabNavigator({ DashboardComponent, icon, label }) {
-    const { t } = useTranslation();
-    return (
-        <Tab.Navigator
-            screenOptions={buildTabScreenOptions({
-                MainTab: icon,
-                ProfileTab: 'person',
-            })}
-        >
-            <Tab.Screen name="MainTab" component={DashboardComponent} options={{ tabBarLabel: label }} />
-            <Tab.Screen name="ProfileTab" component={ProfileStack} options={{ tabBarLabel: t('tab_profile') }} />
-        </Tab.Navigator>
-    );
-}
-
-function ShiftLeaderTabs() {
-    return <SingleTabNavigator DashboardComponent={ShiftLeaderDashboard} icon="assignment" label="Смены" />;
-}
-
-function DispatcherTabs() {
-    return <SingleTabNavigator DashboardComponent={DispatcherDashboard} icon="local-shipping" label="Доставки" />;
-}
-
-function AccountantTabs() {
-    return <SingleTabNavigator DashboardComponent={AccountantDashboard} icon="account-balance" label="Финансы" />;
-}
-
-function MarketerTabs() {
-    return <SingleTabNavigator DashboardComponent={MarketerDashboard} icon="campaign" label="Маркетинг" />;
-}
-
-function AnalystTabs() {
-    return <SingleTabNavigator DashboardComponent={AnalystDashboard} icon="analytics" label="Аналитика" />;
-}
-
-function SupportTabs() {
-    return <SingleTabNavigator DashboardComponent={SupportDashboard} icon="support-agent" label="Поддержка" />;
-}
-
-function AuditorTabs() {
-    return <SingleTabNavigator DashboardComponent={AuditorDashboard} icon="fact-check" label="Аудит" />;
-}
-
-function SupplierTabs() {
-    return <SingleTabNavigator DashboardComponent={SupplierDashboard} icon="inventory-2" label="Поставки" />;
-}
-
-function GuestMenuStack() {
-    return (
-        <Stack.Navigator screenOptions={{ headerShown: false }}>
-            <Stack.Screen name="GuestMenuHome" component={GuestMenuScreen} />
-        </Stack.Navigator>
-    );
-}
-
-function GuestCartStack() {
-    return (
-        <Stack.Navigator screenOptions={{ headerShown: false }}>
-            <Stack.Screen name="GuestCartHome" component={GuestCartScreen} />
-            <Stack.Screen name="GuestPayment" component={GuestPaymentScreen} />
-            <Stack.Screen name="GuestOrderTracking" component={GuestOrderTrackingScreen} />
-        </Stack.Navigator>
-    );
-}
-
-function GuestOrderStack() {
-    return (
-        <Stack.Navigator screenOptions={{ headerShown: false }}>
-            <Stack.Screen name="GuestOrderHome" component={GuestOrderTrackingScreen} />
-        </Stack.Navigator>
-    );
-}
-
-function GuestProfileStack() {
-    return (
-        <Stack.Navigator screenOptions={{ headerShown: false }}>
-            <Stack.Screen name="GuestProfileHome" component={GuestProfileScreen} />
-            <Stack.Screen name="GuestSavingsGoal" component={GuestSavingsGoalScreen} />
-        </Stack.Navigator>
-    );
-}
-
-function GuestTabsInner() {
-    const { t } = useTranslation();
-    return (
-        <Tab.Navigator
-            screenOptions={buildTabScreenOptions({
-                ScannerTab: 'qr-code-scanner',
-                MenuTab: 'restaurant-menu',
-                CartTab: 'shopping-cart',
-                OrdersTab: 'receipt',
-                ProfileTab: 'person',
-            })}
-        >
-            <Tab.Screen name="ScannerTab" component={GuestScannerScreen} options={{ tabBarLabel: 'Стол' }} />
-            <Tab.Screen name="MenuTab" component={GuestMenuStack} options={{ tabBarLabel: 'Меню' }} />
-            <Tab.Screen name="CartTab" component={GuestCartStack} options={{ tabBarLabel: 'Корзина' }} />
-            <Tab.Screen name="OrdersTab" component={GuestOrderStack} options={{ tabBarLabel: 'Заказ' }} />
-            <Tab.Screen name="ProfileTab" component={GuestProfileStack} options={{ tabBarLabel: 'Профиль' }} />
-        </Tab.Navigator>
-    );
-}
-
-function GuestTabs() {
-    return (
-        <CartProvider>
-            <GuestTabsInner />
-        </CartProvider>
     );
 }
 
@@ -586,38 +425,21 @@ function getRoleComponent(role) {
         case 'HEAD_CHEF':
         case 'KITCHEN_MANAGER':
             return KitchenTabs;
-        case 'HEAD_WAITER':
-            return HeadWaiterTabs;
         case 'COURIER':
             return CourierTabs;
         case 'BARTENDER':
             return BartenderTabs;
+        case 'BARISTA':
+            return BaristaTabs;
         case 'RESTAURANT_OWNER':
         case 'CHAIN_OWNER':
         case 'SUPER_ADMIN':
         case 'MANAGER':
             return OwnerTabs;
         case 'WAITER':
+        case 'HEAD_WAITER':
         case 'HOSTESS':
             return WaiterTabs;
-        case 'SHIFT_LEADER':
-            return ShiftLeaderTabs;
-        case 'DISPATCHER':
-            return DispatcherTabs;
-        case 'ACCOUNTANT':
-            return AccountantTabs;
-        case 'MARKETER':
-            return MarketerTabs;
-        case 'ANALYST':
-            return AnalystTabs;
-        case 'SUPPORT':
-            return SupportTabs;
-        case 'AUDITOR':
-            return AuditorTabs;
-        case 'SUPPLIER':
-            return SupplierTabs;
-        case 'GUEST':
-            return GuestTabs;
         default:
             return null;
     }
@@ -625,13 +447,22 @@ function getRoleComponent(role) {
 
 export default function AppNavigator() {
     const { user, loading, subscriptionLock } = useAuth();
+    const { isReady: telegramReady } = useTelegram();
 
-    if (loading) {
+    // The web build is the guest-facing Telegram mini app. Native builds keep
+    // the existing staff and kitchen navigation below.
+    const isGuestWebApp = Platform.OS === 'web' && !user;
+
+    if (loading || !telegramReady) {
         return (
             <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: COLORS.backgroundLight }}>
                 <ActivityIndicator size="large" color={COLORS.primary} />
             </View>
         );
+    }
+
+    if (isGuestWebApp) {
+        return <GuestWebApp />;
     }
 
     const MainComponent = user ? getRoleComponent(user.role) : null;
@@ -643,9 +474,6 @@ export default function AppNavigator() {
                 {!user ? (
                     <>
                         <Stack.Screen name="Login" component={LoginScreen} />
-                        <Stack.Screen name="Auth" component={AuthScreen} />
-                        <Stack.Screen name="Register" component={RegisterScreen} />
-                        <Stack.Screen name="LoginTelegram" component={LoginTelegramScreen} />
                         <Stack.Screen name="LinkPhone" component={LinkPhoneScreen} />
                     </>
                 ) : subscriptionLock.blocked && !allowKitchenReadOnly ? (

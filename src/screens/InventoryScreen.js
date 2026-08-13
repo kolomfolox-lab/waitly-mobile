@@ -1,385 +1,243 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
-  FlatList,
-  Modal,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    ActivityIndicator, Alert, Modal, RefreshControl, SafeAreaView,
+    ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import { inventoryAPI } from '../services/inventoryService';
+import { useAuth } from '../context/AuthContext';
+import { getMobileInventorySummary } from '../api/apiService';
+import client from '../api/client';
 
-const COLORS = {
-  primary: '#ff7a59',
-  primaryLight: 'rgba(255, 122, 89, 0.14)',
-  success: '#10b981',
-  background: '#f8fafc',
-  white: '#FFFFFF',
-  textDark: '#0f172a',
-  textMuted: '#64748b',
-  border: '#e2e8f0',
+const C = {
+    primary: '#ff6b6b', primarySoft: 'rgba(255,107,107,0.12)',
+    bg: '#f8f5f5', card: '#ffffff', border: '#e2e8f0',
+    text: '#0f172a', muted: '#94a3b8', success: '#52D681',
+    warning: '#F7B731', accent: '#667eea',
 };
 
-const getIngredientName = (item) => item.ingredient?.name || item.ingredient_name || 'Ingredient';
-const getIngredientUnit = (item) => item.ingredient?.unit || item.unit || '';
-
 export default function InventoryScreen() {
-  const [stock, setStock] = useState([]);
-  const [ingredients, setIngredients] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [showModal, setShowModal] = useState(false);
-  const [selectedIngredient, setSelectedIngredient] = useState(null);
-  const [quantity, setQuantity] = useState('');
-  const [saving, setSaving] = useState(false);
+    const { user } = useAuth();
+    const [items, setItems] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
+    const [showModal, setShowModal] = useState(false);
+    const [writeOffModal, setWriteOffModal] = useState(null);
+    const [selectedWarehouse, setSelectedWarehouse] = useState('all');
 
-  const loadData = async () => {
-    try {
-      const [stockRes, ingredientsRes] = await Promise.all([
-        inventoryAPI.getStock(),
-        inventoryAPI.getIngredients(),
-      ]);
-      setStock(stockRes || []);
-      setIngredients(ingredientsRes || []);
-    } catch (error) {
-      console.error('Error loading inventory:', error);
-      Alert.alert('Inventory unavailable', 'Could not load stock. Pull down to retry.');
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  };
+    const load = useCallback(async () => {
+        try {
+            const inv = await getMobileInventorySummary();
+            setItems(inv?.results || inv || []);
+        } catch { /* silent */ }
+        finally { setLoading(false); setRefreshing(false); }
+    }, []);
 
-  useEffect(() => {
-    loadData();
-  }, []);
+    useEffect(() => { load(); }, [load]);
 
-  const handleRefresh = () => {
-    setRefreshing(true);
-    loadData();
-  };
+    const warehouseTypes = useMemo(() => {
+        const types = new Set(items.map(i => i.warehouse_type || 'Общий'));
+        return ['all', ...Array.from(types)];
+    }, [items]);
 
-  const closeModal = () => {
-    setShowModal(false);
-    setSelectedIngredient(null);
-    setQuantity('');
-  };
+    const filtered = useMemo(() => {
+        if (selectedWarehouse === 'all') return items;
+        return items.filter(i => (i.warehouse_type || 'Общий') === selectedWarehouse);
+    }, [items, selectedWarehouse]);
 
-  const handleAddIncoming = async () => {
-    if (!selectedIngredient || !quantity) {
-      Alert.alert('Missing data', 'Choose an ingredient and enter quantity.');
-      return;
-    }
+    const lowCount = useMemo(() => items.filter(i => i.is_low || i.is_empty).length, [items]);
 
-    const parsedQuantity = Number.parseFloat(quantity.replace(',', '.'));
-    if (!Number.isFinite(parsedQuantity) || parsedQuantity <= 0) {
-      Alert.alert('Invalid quantity', 'Quantity must be greater than zero.');
-      return;
-    }
+    const handleSupply = async () => {
+        setShowModal(true);
+    };
 
-    setSaving(true);
-    try {
-      await inventoryAPI.addIncoming(selectedIngredient, parsedQuantity);
-      closeModal();
-      loadData();
-      Alert.alert('Saved', 'Stock receipt was added.');
-    } catch (error) {
-      console.error('Error saving inventory receipt:', error);
-      Alert.alert('Save failed', 'Could not add stock receipt.');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const renderStockItem = ({ item }) => (
-    <View style={styles.stockCard}>
-      <View style={styles.stockInfo}>
-        <Text style={styles.ingredientName}>{getIngredientName(item)}</Text>
-        <Text style={styles.unitText}>Unit: {getIngredientUnit(item) || '-'}</Text>
-      </View>
-      <View style={styles.quantityContainer}>
-        <Text style={styles.quantityText}>
-          {item.quantity} {getIngredientUnit(item)}
-        </Text>
-      </View>
-    </View>
-  );
-
-  if (loading) {
-    return (
-      <View style={styles.centered}>
-        <ActivityIndicator size="large" color={COLORS.primary} />
-      </View>
-    );
-  }
-
-  return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.kicker}>Inventory</Text>
-          <Text style={styles.title}>Stock control</Text>
-        </View>
-        <TouchableOpacity style={styles.addButton} onPress={() => setShowModal(true)}>
-          <MaterialIcons name="add" size={26} color={COLORS.white} />
-        </TouchableOpacity>
-      </View>
-
-      <FlatList
-        data={stock}
-        renderItem={renderStockItem}
-        keyExtractor={(item, index) => String(item.id || item.ingredient?.id || index)}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
-        ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <MaterialIcons name="inventory" size={48} color={COLORS.textMuted} />
-            <Text style={styles.emptyText}>No stock records yet</Text>
-          </View>
+    const submitSupply = async (ingredientId, qty) => {
+        try {
+            await client.post('/inventory/stock/incoming/', { ingredient_id: ingredientId, quantity: qty });
+            Alert.alert('Готово', 'Поставка добавлена');
+            load();
+        } catch {
+            Alert.alert('Ошибка', 'Не удалось добавить поставку');
         }
-        contentContainerStyle={styles.listContent}
-      />
+    };
 
-      <Modal visible={showModal} animationType="slide" transparent onRequestClose={closeModal}>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Add stock receipt</Text>
+    const submitWriteOff = async () => {
+        if (!writeOffModal) return;
+        try {
+            await client.post('/api/v1/mobile/inventory/write-off/', {
+                ingredient_id: writeOffModal.ingredient_id,
+                quantity: writeOffModal.quantity,
+                note: writeOffModal.note || '',
+            });
+            Alert.alert('Готово', 'Списание выполнено');
+            setWriteOffModal(null);
+            load();
+        } catch {
+            Alert.alert('Ошибка', 'Не удалось списать');
+        }
+    };
 
-            <Text style={styles.label}>Ingredient</Text>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.ingredientChips}
-            >
-              {ingredients.length === 0 && (
-                <Text style={styles.emptyChipText}>Create ingredients in owner dashboard first.</Text>
-              )}
-              {ingredients.map((ingredient) => {
-                const active = selectedIngredient === ingredient.id;
-                return (
-                  <TouchableOpacity
-                    key={ingredient.id}
-                    style={[styles.ingredientChip, active && styles.ingredientChipActive]}
-                    onPress={() => setSelectedIngredient(ingredient.id)}
-                  >
-                    <Text style={[styles.ingredientChipText, active && styles.ingredientChipTextActive]}>
-                      {ingredient.name} ({ingredient.unit})
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
+    const getStatusIcon = (item) => {
+        if (item.is_empty) return { icon: 'error', color: C.primary };
+        if (item.is_low) return { icon: 'warning', color: C.warning };
+        return { icon: 'check-circle', color: C.success };
+    };
+
+    if (loading) {
+        return (
+            <View style={styles.center}>
+                <ActivityIndicator size="large" color={C.primary} />
+            </View>
+        );
+    }
+
+    return (
+        <SafeAreaView style={styles.container}>
+            <View style={styles.header}>
+                <View>
+                    <Text style={styles.kicker}>Inventory</Text>
+                    <Text style={styles.title}>Склад</Text>
+                    <Text style={styles.subtitle}>{(items || []).length} позиций · {lowCount} тревог</Text>
+                </View>
+                <TouchableOpacity style={styles.addBtn} onPress={handleSupply}>
+                    <MaterialIcons name="add" size={22} color="#fff" />
+                </TouchableOpacity>
+            </View>
+
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ paddingHorizontal: 16, paddingTop: 8 }} contentContainerStyle={{ gap: 8 }}>
+                {warehouseTypes.map(type => (
+                    <TouchableOpacity key={type} onPress={() => setSelectedWarehouse(type)}
+                        style={[styles.chip, selectedWarehouse === type && styles.chipActive]}>
+                        <Text style={[styles.chipText, selectedWarehouse === type && styles.chipActiveText]}>
+                            {type === 'all' ? 'Все' : type}
+                        </Text>
+                    </TouchableOpacity>
+                ))}
             </ScrollView>
 
-            <Text style={styles.label}>Quantity</Text>
-            <TextInput
-              style={styles.input}
-              value={quantity}
-              onChangeText={setQuantity}
-              placeholder="0.000"
-              keyboardType="decimal-pad"
-              placeholderTextColor={COLORS.textMuted}
+            <FlatList
+                data={filtered}
+                keyExtractor={(item, idx) => item.ingredient_id || idx.toString()}
+                contentContainerStyle={{ padding: 16, gap: 8 }}
+                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} />}
+                renderItem={({ item }) => {
+                    const { icon, color } = getStatusIcon(item);
+                    return (
+                        <TouchableOpacity style={styles.item} onLongPress={() => {
+                            if (!item.is_empty) setWriteOffModal({
+                                ingredient_id: item.ingredient_id,
+                                ingredient_name: item.ingredient_name,
+                                quantity: 0,
+                                note: '',
+                            });
+                        }}>
+                            <MaterialIcons name={icon} size={20} color={color} />
+                            <View style={{ flex: 1, marginLeft: 12 }}>
+                                <Text style={styles.itemName}>{item.ingredient_name}</Text>
+                                <Text style={styles.itemMeta}>
+                                    {item.quantity} {item.unit}
+                                    {item.warehouse_name ? ` · ${item.warehouse_name}` : ''}
+                                </Text>
+                            </View>
+                            {item.minimum_quantity && Number(item.quantity) < Number(item.minimum_quantity) && (
+                                <Text style={styles.minLabel}>мин {item.minimum_quantity}</Text>
+                            )}
+                            <TouchableOpacity style={styles.writeOffBtn} onPress={() => submitSupply(item.ingredient_id, 1)}>
+                                <MaterialIcons name="add" size={16} color={C.accent} />
+                            </TouchableOpacity>
+                        </TouchableOpacity>
+                    );
+                }}
+                ListEmptyComponent={
+                    <View style={{ alignItems: 'center', paddingVertical: 40 }}>
+                        <MaterialIcons name="inventory-2" size={48} color={C.muted} />
+                        <Text style={{ color: C.muted, marginTop: 8 }}>Нет ингредиентов на складе</Text>
+                    </View>
+                }
             />
 
-            <View style={styles.modalButtons}>
-              <TouchableOpacity style={[styles.button, styles.cancelButton]} onPress={closeModal}>
-                <Text style={styles.cancelButtonText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.button, styles.saveButton, saving && styles.disabledButton]}
-                onPress={handleAddIncoming}
-                disabled={saving}
-              >
-                <Text style={styles.saveButtonText}>{saving ? 'Saving...' : 'Save receipt'}</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
-    </View>
-  );
+            <Modal visible={showModal} transparent animationType="slide">
+                <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.4)' }}>
+                    <View style={styles.modalSheet}>
+                        <Text style={styles.modalTitle}>Быстрая поставка</Text>
+                        <Text style={styles.modalNote}>Добавьте количество к ингредиенту</Text>
+                        {items.slice(0, 20).map(item => (
+                            <TouchableOpacity key={item.ingredient_id} style={styles.quickItem}
+                                onPress={() => {
+                                    Alert.prompt('Количество', `${item.ingredient_name}:`, (val) => {
+                                        if (val && Number(val) > 0) submitSupply(item.ingredient_id, Number(val));
+                                    }, 'plain-text', '1', 'decimal');
+                                }}>
+                                <Text style={styles.quickName}>{item.ingredient_name}</Text>
+                                <Text style={styles.quickQty}>{item.quantity} {item.unit}</Text>
+                            </TouchableOpacity>
+                        ))}
+                        <TouchableOpacity style={styles.closeBtn} onPress={() => setShowModal(false)}>
+                            <Text style={styles.closeBtnText}>Закрыть</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </Modal>
+
+            <Modal visible={!!writeOffModal} transparent animationType="fade">
+                <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.4)' }}>
+                    <View style={styles.writeOffSheet}>
+                        <Text style={styles.modalTitle}>Списание</Text>
+                        <Text style={styles.modalNote}>{writeOffModal?.ingredient_name}</Text>
+                        <TextInput
+                            value={writeOffModal?.quantity?.toString()}
+                            onChangeText={v => setWriteOffModal(prev => ({ ...prev, quantity: Number(v) || 0 }))}
+                            placeholder="Количество"
+                            keyboardType="numeric"
+                            style={styles.input}
+                        />
+                        <TextInput
+                            value={writeOffModal?.note}
+                            onChangeText={v => setWriteOffModal(prev => ({ ...prev, note: v }))}
+                            placeholder="Причина"
+                            style={styles.input}
+                        />
+                        <View style={{ flexDirection: 'row', gap: 12, marginTop: 16 }}>
+                            <TouchableOpacity style={styles.cancelBtn} onPress={() => setWriteOffModal(null)}>
+                                <Text style={{ color: C.muted, fontWeight: '700' }}>Отмена</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity style={styles.confirmBtn} onPress={submitWriteOff}>
+                                <Text style={{ color: '#fff', fontWeight: '700' }}>Списать</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
+        </SafeAreaView>
+    );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.background,
-  },
-  centered: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 16,
-    backgroundColor: COLORS.white,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
-  },
-  kicker: {
-    color: COLORS.primary,
-    fontSize: 11,
-    fontWeight: '800',
-    letterSpacing: 2,
-    textTransform: 'uppercase',
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: COLORS.textDark,
-  },
-  addButton: {
-    backgroundColor: COLORS.primary,
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  listContent: {
-    padding: 16,
-  },
-  stockCard: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: COLORS.white,
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  stockInfo: {
-    flex: 1,
-  },
-  ingredientName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: COLORS.textDark,
-    marginBottom: 4,
-  },
-  unitText: {
-    fontSize: 12,
-    color: COLORS.textMuted,
-  },
-  quantityContainer: {
-    backgroundColor: COLORS.primaryLight,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
-  },
-  quantityText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: COLORS.primary,
-  },
-  emptyContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 48,
-  },
-  emptyText: {
-    marginTop: 12,
-    fontSize: 16,
-    color: COLORS.textMuted,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalContent: {
-    backgroundColor: COLORS.white,
-    borderRadius: 16,
-    padding: 24,
-    width: '90%',
-    maxHeight: '80%',
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: COLORS.textDark,
-    marginBottom: 16,
-  },
-  label: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: COLORS.textDark,
-    marginBottom: 8,
-  },
-  ingredientChips: {
-    gap: 8,
-    paddingBottom: 16,
-  },
-  ingredientChip: {
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    borderRadius: 999,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    backgroundColor: COLORS.background,
-  },
-  ingredientChipActive: {
-    borderColor: COLORS.primary,
-    backgroundColor: COLORS.primaryLight,
-  },
-  ingredientChipText: {
-    color: COLORS.textDark,
-    fontWeight: '600',
-  },
-  ingredientChipTextActive: {
-    color: COLORS.primary,
-  },
-  emptyChipText: {
-    color: COLORS.textMuted,
-    paddingVertical: 10,
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-    marginBottom: 16,
-    color: COLORS.textDark,
-  },
-  modalButtons: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  button: {
-    flex: 1,
-    padding: 14,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  cancelButton: {
-    backgroundColor: COLORS.background,
-  },
-  cancelButtonText: {
-    color: COLORS.textDark,
-    fontWeight: '600',
-  },
-  saveButton: {
-    backgroundColor: COLORS.primary,
-  },
-  saveButtonText: {
-    color: COLORS.white,
-    fontWeight: '600',
-  },
-  disabledButton: {
-    opacity: 0.5,
-  },
+    container: { flex: 1, backgroundColor: C.bg },
+    center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: C.bg },
+    header: { paddingHorizontal: 20, paddingVertical: 18, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: C.card, borderBottomWidth: 1, borderBottomColor: C.border },
+    kicker: { color: '#8bd8ff', fontSize: 10, fontWeight: '900', letterSpacing: 3, textTransform: 'uppercase' },
+    title: { color: C.text, fontSize: 34, fontWeight: '900', letterSpacing: -1 },
+    subtitle: { color: C.muted, fontSize: 13, marginTop: 2 },
+    addBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: C.primary, alignItems: 'center', justifyContent: 'center' },
+    chip: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, backgroundColor: C.card, borderWidth: 1, borderColor: C.border },
+    chipActive: { backgroundColor: C.accent, borderColor: C.accent },
+    chipText: { fontSize: 13, fontWeight: '700', color: C.muted },
+    chipActiveText: { color: '#fff' },
+    item: { flexDirection: 'row', alignItems: 'center', backgroundColor: C.card, borderWidth: 1, borderColor: C.border, borderRadius: 16, padding: 14 },
+    itemName: { color: C.text, fontSize: 14, fontWeight: '700' },
+    itemMeta: { color: C.muted, fontSize: 11, marginTop: 2 },
+    minLabel: { color: C.warning, fontSize: 10, fontWeight: '700', marginRight: 8 },
+    writeOffBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: 'rgba(102,126,234,0.12)', alignItems: 'center', justifyContent: 'center' },
+    modalSheet: { backgroundColor: C.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, maxHeight: '70%' },
+    modalTitle: { fontSize: 20, fontWeight: '900', color: C.text },
+    modalNote: { color: C.muted, fontSize: 13, marginTop: 4, marginBottom: 16 },
+    quickItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: C.border },
+    quickName: { color: C.text, fontWeight: '700' },
+    quickQty: { color: C.muted, fontSize: 12 },
+    closeBtn: { marginTop: 16, padding: 14, backgroundColor: C.bg, borderRadius: 14, alignItems: 'center' },
+    closeBtnText: { color: C.muted, fontWeight: '700' },
+    writeOffSheet: { width: '85%', backgroundColor: C.card, borderRadius: 24, padding: 24 },
+    input: { borderWidth: 1, borderColor: C.border, borderRadius: 14, padding: 14, fontSize: 14, color: C.text, marginTop: 12 },
+    cancelBtn: { flex: 1, padding: 14, borderRadius: 14, alignItems: 'center', backgroundColor: C.bg },
+    confirmBtn: { flex: 1, padding: 14, borderRadius: 14, alignItems: 'center', backgroundColor: C.primary },
 });

@@ -13,6 +13,7 @@ export function TelegramProvider({ children }) {
   const [theme, setTheme] = useState({});
   const [isReady, setIsReady] = useState(false);
   const [isTelegramEnv, setIsTelegramEnv] = useState(false);
+  const [startParam, setStartParam] = useState('');
 
   useEffect(() => {
     if (Platform.OS !== 'web') {
@@ -26,6 +27,7 @@ export function TelegramProvider({ children }) {
         setIsTelegramEnv(true);
         setInitData(WebApp.initData || '');
         setTelegramUser(WebApp.initDataUnsafe.user || null);
+        setStartParam(WebApp.initDataUnsafe.start_param || WebApp.initDataUnsafe.startapp || '');
         setColorScheme(WebApp.colorScheme || 'light');
         setTheme(WebApp.themeParams || {});
 
@@ -52,6 +54,7 @@ export function TelegramProvider({ children }) {
       theme,
       isReady,
       isTelegramEnv,
+      startParam,
     }}>
       {children}
     </TelegramContext.Provider>

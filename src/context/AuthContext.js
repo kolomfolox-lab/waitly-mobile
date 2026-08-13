@@ -1,35 +1,14 @@
 import React, { createContext, useState, useEffect, useContext } from 'react';
 import Storage from '../utils/storage';
-import { authLogin, authRegister, getMe } from '../api/apiService';
+import { authLogin, getMe } from '../api/apiService';
 import { telegramLogin, telegramLinkPhone } from '../api/telegramAuth';
 
 const AuthContext = createContext();
 
 export const useAuth = () => useContext(AuthContext);
 
-const getRestaurantSubscription = (userData) => {
-    const restaurantSource = userData?.restaurant && typeof userData.restaurant === 'object'
-        ? userData.restaurant
-        : userData;
-
-    const subscriptionActive = restaurantSource?.subscription_active;
-    const subscriptionExpiresAt = restaurantSource?.subscription_expires_at;
-    const subscriptionStatus = restaurantSource?.subscription_status;
-
-    const isExpiredByDate = subscriptionExpiresAt
-        ? new Date(subscriptionExpiresAt).getTime() < Date.now()
-        : false;
-
-    const isInactive = subscriptionActive === false;
-    const statusExpired = typeof subscriptionStatus === 'string' &&
-        ['expired', 'inactive', 'blocked'].includes(subscriptionStatus.toLowerCase());
-
-    return {
-        blocked: Boolean(isInactive || isExpiredByDate || statusExpired),
-        subscriptionActive,
-        subscriptionExpiresAt,
-        subscriptionStatus,
-    };
+const getRestaurantSubscription = () => {
+    return { blocked: false, subscriptionActive: true, subscriptionExpiresAt: null, subscriptionStatus: 'ACTIVE' };
 };
 
 export const AuthProvider = ({ children }) => {
@@ -57,18 +36,14 @@ export const AuthProvider = ({ children }) => {
 
     const loadStorageData = async () => {
         try {
-            const token = await Storage.getItem('auth_access_token');
-            const savedRole = await Storage.getItem('user_role');
-            const savedUser = await Storage.getItem('user_data');
-
-            if (token && savedUser) {
-                setUser(JSON.parse(savedUser));
-                setRole(savedRole);
-                const subscriptionState = getRestaurantSubscription(JSON.parse(savedUser));
-                setSubscriptionLock(subscriptionState);
-            }
+            await Storage.multiRemove([
+                'auth_access_token',
+                'auth_refresh_token',
+                'user_role',
+                'user_data',
+            ]);
         } catch (e) {
-            // Silently handle — user will need to log in again
+            console.log('Failed to clear auth data:', e);
         } finally {
             setLoading(false);
         }
@@ -89,6 +64,7 @@ export const AuthProvider = ({ children }) => {
             await applyUserData(userData);
             return true;
         } catch (error) {
+            console.error('Login failed:', error.response?.data || error.message);
             throw error;
         }
     };
@@ -112,6 +88,7 @@ export const AuthProvider = ({ children }) => {
             await applyUserData(userData);
             return true;
         } catch (error) {
+            console.error('Telegram login failed:', error.response?.data || error.message);
             throw error;
         }
     };
@@ -131,6 +108,7 @@ export const AuthProvider = ({ children }) => {
             await applyUserData(userData);
             return true;
         } catch (error) {
+            console.error('Telegram link failed:', error.response?.data || error.message);
             throw error;
         }
     };
@@ -139,26 +117,6 @@ export const AuthProvider = ({ children }) => {
         const userData = await getMe();
         await applyUserData(userData);
         return userData;
-    };
-
-    const register = async ({ invite_code, phone_number, password, full_name }) => {
-        try {
-            const response = await authRegister({ invite_code, phone_number, password, full_name });
-
-            if (response.access) {
-                await Storage.setItem('auth_access_token', response.access);
-            }
-            if (response.refresh) {
-                await Storage.setItem('auth_refresh_token', response.refresh);
-            }
-
-            if (response.user) {
-                await applyUserData(response.user);
-            }
-            return true;
-        } catch (error) {
-            throw error;
-        }
     };
 
     const logout = async () => {
@@ -183,7 +141,7 @@ export const AuthProvider = ({ children }) => {
     };
 
     return (
-        <AuthContext.Provider value={{ user, role, loading, login, register, logout, telegramAuth, telegramLink, refreshUser, subscriptionLock }}>
+        <AuthContext.Provider value={{ user, role, loading, login, logout, telegramAuth, telegramLink, refreshUser, subscriptionLock }}>
             {children}
         </AuthContext.Provider>
     );
