@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useAuth } from '../../context/AuthContext';
 import { getSavingsGoal, updateSavingsGoal } from '../../api/apiService';
 
 const COLORS = {
@@ -27,6 +28,7 @@ const COLORS = {
 };
 
 export default function GuestSavingsGoalScreen({ navigation }) {
+    const { user } = useAuth();
     const [goal, setGoal] = useState(null);
     const [name, setName] = useState('');
     const [targetAmount, setTargetAmount] = useState('');
@@ -34,7 +36,7 @@ export default function GuestSavingsGoalScreen({ navigation }) {
     const [saving, setSaving] = useState(false);
 
     useEffect(() => {
-        getSavingsGoal()
+        getSavingsGoal(user?.phone_number)
             .then(r => {
                 setGoal(r);
                 setName(r.name || '');
@@ -51,7 +53,7 @@ export default function GuestSavingsGoalScreen({ navigation }) {
         }
         setSaving(true);
         try {
-            await updateSavingsGoal({ name: name.trim(), target_amount: parseFloat(targetAmount) });
+            await updateSavingsGoal(user?.phone_number, { name: name.trim(), target_amount: parseFloat(targetAmount) });
             Alert.alert('Готово', 'Копилка сохранена');
             navigation.goBack();
         } catch {

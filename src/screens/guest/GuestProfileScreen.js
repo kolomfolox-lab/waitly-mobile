@@ -48,7 +48,7 @@ export default function GuestProfileScreen({ navigation }) {
         try {
             const [ordersRes, savingsRes] = await Promise.all([
                 api.get('/api/v1/guest/orders/active/'),
-                getSavingsGoal().catch(() => null),
+                getSavingsGoal(user?.phone_number).catch(() => null),
             ]);
             setOrders(ordersRes.data?.results || ordersRes.data || []);
             if (savingsRes) setSavingsGoal(savingsRes);

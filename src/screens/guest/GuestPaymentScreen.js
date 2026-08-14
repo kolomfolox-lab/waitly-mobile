@@ -44,7 +44,7 @@ export default function GuestPaymentScreen({ route, navigation }) {
 
     useEffect(() => {
         getServiceCharge().then(r => setServiceChargePercent(r.percent || 0)).catch(() => {});
-        getSavingsGoal().then(r => setSavingsGoal(r)).catch(() => {});
+        getSavingsGoal(user?.phone_number).then(r => setSavingsGoal(r)).catch(() => {});
         api.get('/api/v1/guest/waiter/goal/').then(r => setWaiterGoal(r.data?.goal || null)).catch(() => {});
     }, []);
 
@@ -66,11 +66,11 @@ export default function GuestPaymentScreen({ route, navigation }) {
         try {
             // Tip processing
             if (parseFloat(tipAmount) > 0) {
-                await createTip({ waiter_id: null, amount: parseFloat(tipAmount) }).catch(() => {});
+                await createTip({ order_id: orderId, amount: parseFloat(tipAmount) }).catch(() => {});
             }
             // Savings contribution
-            if (parseFloat(savingsContribute) > 0) {
-                await contributeToSavings(parseFloat(savingsContribute)).catch(() => {});
+            if (parseFloat(savingsContribute) > 0 && savingsGoal?.id) {
+                await contributeToSavings({ goal_id: savingsGoal.id, amount: parseFloat(savingsContribute) }).catch(() => {});
             }
             await api.post('/api/v1/guest/payment/init/', {
                 method: selectedMethod,

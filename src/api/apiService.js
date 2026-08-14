@@ -375,3 +375,40 @@ export const aiPendingActions = async () => {
     const response = await apiClient.get('/api/owner/ai/pending/');
     return response.data;
 };
+
+// =====================
+// Guest — savings / tips / service charge
+// =====================
+
+export const getServiceCharge = async () => {
+    const response = await apiClient.get('/api/v1/guest/bill/');
+    return { percent: response.data?.bill?.service_charge_percent || 0 };
+};
+
+export const getSavingsGoal = async (phone) => {
+    const response = await apiClient.get('/api/v1/guest/savings/goal/', { params: { phone } });
+    return response.data?.goal ?? null;
+};
+
+export const updateSavingsGoal = async (phone, { name, target_amount } = {}) => {
+    const response = await apiClient.post('/api/v1/guest/savings/goal/', {
+        phone,
+        name,
+        target_amount,
+    });
+    return response.data?.goal ?? null;
+};
+
+export const createTip = async ({ order_id, amount, guest_name } = {}) => {
+    const response = await apiClient.post('/api/v1/guest/tips/create/', {
+        order_id,
+        amount,
+        guest_name,
+    });
+    return response.data;
+};
+
+export const contributeToSavings = async ({ goal_id, amount } = {}) => {
+    const response = await apiClient.post('/api/v1/guest/savings/contribute/', { goal_id, amount });
+    return response.data;
+};
