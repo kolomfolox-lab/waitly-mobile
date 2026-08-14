@@ -2,7 +2,7 @@ import axios from 'axios';
 import Storage from '../utils/storage';
 import Constants from 'expo-constants';
 
-const API_BASE_URL = Constants.expoConfig?.extra?.apiUrl || 'https://api.moonlauncher.org';
+const API_BASE_URL = Constants.expoConfig?.extra?.apiUrl || 'https://api.waitly.uz';
 
 const apiClient = axios.create({
     baseURL: API_BASE_URL,
