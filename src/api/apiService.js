@@ -412,3 +412,66 @@ export const contributeToSavings = async ({ goal_id, amount } = {}) => {
     const response = await apiClient.post('/api/v1/guest/savings/contribute/', { goal_id, amount });
     return response.data;
 };
+
+// Owner - POS (касса)
+export const getPosSettings = async () => {
+    const response = await apiClient.get('/api/v1/owner/pos-settings/');
+    return response.data;
+};
+
+export const updatePosSettings = async (payload) => {
+    const response = await apiClient.put('/api/v1/owner/pos-settings/', payload);
+    return response.data;
+};
+
+export const setStaffPin = async (userId, pin) => {
+    const response = await apiClient.post(`/api/v1/owner/users/${userId}/set-pin/`, { pin });
+    return response.data;
+};
+
+export const clearStaffPin = async (userId) => {
+    const response = await apiClient.post(`/api/v1/owner/users/${userId}/clear-pin/`, {});
+    return response.data;
+};
+
+export const getPosCertificates = async () => {
+    const response = await apiClient.get('/api/v1/owner/pos/certificates/');
+    return response.data;
+};
+
+export const createPosCertificate = async (payload) => {
+    const response = await apiClient.post('/api/v1/owner/pos/certificates/', payload);
+    return response.data;
+};
+
+// Кассовая смена (POS): открыть / изъятие / Z-отчёт
+export const getPosShift = async () => {
+    const response = await apiClient.get('/api/v1/pos/shift/');
+    return response.data;
+};
+
+export const openPosShift = async (openingCash) => {
+    const response = await apiClient.post('/api/v1/pos/shift/', { opening_cash: Number(openingCash) });
+    return response.data;
+};
+
+export const dropPosShift = async (amount, comment = '') => {
+    const response = await apiClient.post('/api/v1/pos/shift/drop/', { amount: Number(amount), comment });
+    return response.data;
+};
+
+export const closePosShift = async (actualCash) => {
+    const response = await apiClient.post('/api/v1/pos/shift/close/', { actual_cash: Number(actualCash) });
+    return response.data;
+};
+
+// Обратный Magic Pair: касса сама генерирует код/QR, владелец подтверждает
+export const createPosPairRequest = async () => {
+    const response = await apiClient.post('/api/v1/pos/pair-request/');
+    return response.data;
+};
+
+export const getPosPairRequest = async (code) => {
+    const response = await apiClient.get(`/api/v1/pos/pair-request/${code}/`);
+    return response.data;
+};

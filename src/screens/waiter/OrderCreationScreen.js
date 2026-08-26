@@ -219,6 +219,19 @@ export default function OrderCreationScreen({ route, navigation }) {
             });
         } catch (e) {
             console.log('Order creation failed:', e.response?.data || e.message);
+            // Политика «1 заказ = 1 стол»: бэк отдаёт 409 TABLE_HAS_ACTIVE_ORDER
+            // (OrderViewSet) / POS_TABLE_BUSY (pos_views). Показываем «Стол занят»
+            // и сразу открываем существующий чек стола.
+            const code = e?.response?.data?.error?.code;
+            if (code === 'TABLE_HAS_ACTIVE_ORDER' || code === 'POS_TABLE_BUSY') {
+                Alert.alert(
+                    'Стол занят',
+                    'На этом столе уже есть активный заказ — открываем его…',
+                    [{ text: 'ОК' }],
+                );
+                navigation.replace('OrderModify', { tableNumber, tableId });
+                return;
+            }
             Alert.alert(
                 'Ошибка',
                 'Не удалось создать заказ: ' + formatApiError(e)

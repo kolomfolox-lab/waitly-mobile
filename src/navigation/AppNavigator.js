@@ -15,6 +15,9 @@ import GuestWebApp from '../screens/guest/GuestWebApp';
 
 const Stack = createStackNavigator();
 import LoginScreen from '../screens/common/LoginScreen';
+import AuthScreen from '../screens/common/AuthScreen';
+import RegisterScreen from '../screens/common/RegisterScreen';
+import LoginTelegramScreen from '../screens/common/LoginTelegramScreen';
 import LinkPhoneScreen from '../screens/common/LinkPhoneScreen';
 import SubscriptionExpiredScreen from '../screens/common/SubscriptionExpiredScreen';
 import UnauthorizedRoleScreen from '../screens/common/UnauthorizedRoleScreen';
@@ -25,6 +28,7 @@ import WaiterTables from '../screens/waiter/WaiterTables';
 import OrdersListScreen from '../screens/waiter/OrdersListScreen';
 import OrderCreationScreen from '../screens/waiter/OrderCreationScreen';
 import OrderConfirmationScreen from '../screens/waiter/OrderConfirmationScreen';
+import OrderModifyScreen from '../screens/waiter/OrderModifyScreen';
 import ProfileScreen from '../screens/waiter/ProfileScreen';
 import NotificationsScreen from '../screens/waiter/NotificationsScreen';
 import LanguageScreen from '../screens/waiter/LanguageScreen';
@@ -58,6 +62,7 @@ import OwnerDashboard from '../screens/owner/OwnerDashboard';
 import StaffScreen from '../screens/owner/StaffScreen';
 import OwnerMenuScreen from '../screens/owner/OwnerMenuScreen';
 import OwnerAIChatScreen from '../screens/owner/OwnerAIChatScreen';
+import PosScreen from '../screens/owner/PosScreen';
 import InventoryScreen from '../screens/InventoryScreen';
 
 // Chef
@@ -159,6 +164,7 @@ function WaiterDashboardStack() {
             <Stack.Screen name="DashboardHome" component={WaiterDashboard} />
             <Stack.Screen name="OrderCreation" component={OrderCreationScreen} />
             <Stack.Screen name="OrderConfirmation" component={OrderConfirmationScreen} options={{ gestureEnabled: false }} />
+            <Stack.Screen name="OrderModify" component={OrderModifyScreen} />
         </Stack.Navigator>
     );
 }
@@ -169,6 +175,7 @@ function WaiterTablesStack() {
             <Stack.Screen name="TablesHome" component={WaiterTables} />
             <Stack.Screen name="OrderCreation" component={OrderCreationScreen} />
             <Stack.Screen name="OrderConfirmation" component={OrderConfirmationScreen} options={{ gestureEnabled: false }} />
+            <Stack.Screen name="OrderModify" component={OrderModifyScreen} />
         </Stack.Navigator>
     );
 }
@@ -404,6 +411,7 @@ function OwnerTabs() {
                 StaffTab: 'people',
                 OwnerMenuTab: 'restaurant-menu',
                 InventoryTab: 'inventory',
+                PosTab: 'point-of-sale',
                 AiTab: 'auto-awesome',
                 ProfileTab: 'person',
             })}
@@ -412,6 +420,7 @@ function OwnerTabs() {
             <Tab.Screen name="AiTab" component={OwnerAIChatScreen} options={{ tabBarLabel: 'AI' }} />
             <Tab.Screen name="StaffTab" component={StaffScreen} options={{ tabBarLabel: 'Персонал' }} />
             <Tab.Screen name="OwnerMenuTab" component={OwnerMenuScreen} options={{ tabBarLabel: 'Меню' }} />
+            <Tab.Screen name="PosTab" component={PosScreen} options={{ tabBarLabel: 'Касса' }} />
             <Tab.Screen name="ProfileTab" component={ProfileStack} options={{ tabBarLabel: 'Профиль' }} />
             <Tab.Screen name="InventoryTab" component={InventoryScreen} options={{ tabBarLabel: 'Склад' }} />
         </Tab.Navigator>
@@ -426,6 +435,7 @@ function getRoleComponent(role) {
         case 'KITCHEN_MANAGER':
             return KitchenTabs;
         case 'COURIER':
+        case 'DISPATCHER':
             return CourierTabs;
         case 'BARTENDER':
             return BartenderTabs;
@@ -435,10 +445,17 @@ function getRoleComponent(role) {
         case 'CHAIN_OWNER':
         case 'SUPER_ADMIN':
         case 'MANAGER':
+        case 'ACCOUNTANT':
+        case 'MARKETER':
+        case 'ANALYST':
+        case 'SUPPORT':
+        case 'AUDITOR':
+        case 'SUPPLIER':
             return OwnerTabs;
         case 'WAITER':
         case 'HEAD_WAITER':
         case 'HOSTESS':
+        case 'SHIFT_LEADER':
             return WaiterTabs;
         default:
             return null;
@@ -474,6 +491,9 @@ export default function AppNavigator() {
                 {!user ? (
                     <>
                         <Stack.Screen name="Login" component={LoginScreen} />
+                        <Stack.Screen name="Auth" component={AuthScreen} />
+                        <Stack.Screen name="Register" component={RegisterScreen} />
+                        <Stack.Screen name="LoginTelegram" component={LoginTelegramScreen} />
                         <Stack.Screen name="LinkPhone" component={LinkPhoneScreen} />
                     </>
                 ) : subscriptionLock.blocked && !allowKitchenReadOnly ? (
