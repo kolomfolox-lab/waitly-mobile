@@ -37,13 +37,14 @@ const COLORS = {
 /**
  * TWA-вход персонала в дизайне LoginScreen (гитхаб-канон):
  * логотип с анимацией, градиентные кнопки, карточки ввода.
- * Фазы: login (тихий по initData) → phone (номер → сверка с базой) →
- * tg (явный вход через Telegram: Поделиться номером) →
- * credentials (номер+пароль) / register (инвайт) → дальше табы по роли.
+ * Фазы: login (тихий по initData) → waiting (ЖДЁМ данные из бэка:
+ * кто это, какой номер — опрос login пока бот не подтвердит) →
+ * tg (явный шаринг номера) → credentials (номер+пароль) /
+ * register (инвайт) / guest → дальше табы по роли.
  */
 export default function HostessEntryGate() {
     const { telegramAuth, login } = useAuth();
-    const { initData, isTelegramEnv, webAppVersion, tgPlatform, requestContact } = useTelegram() || {};
+    const { initData, isTelegramEnv, webAppVersion, tgPlatform, requestContact, telegramUser } = useTelegram() || {};
     const [phase, setPhase] = useState('login');
     const [error, setError] = useState('');
     const [phone, setPhone] = useState('+998');
@@ -51,6 +52,11 @@ export default function HostessEntryGate() {
     const [formError, setFormError] = useState('');
     const [busy, setBusy] = useState(false);
     const [attempt, setAttempt] = useState(0);
+    const [waitCount, setWaitCount] = useState(0);
+
+    // Сколько ждём данных из бэка: ~90 секунд, дальше — честная ошибка.
+    const WAIT_MAX_TRIES = 36;
+    const WAIT_GAP_MS = 2500;
 
     /* ── анимация логотипа (как в LoginScreen) ── */
     const logoScale = useRef(new Animated.Value(0.5)).current;
@@ -81,29 +87,93 @@ export default function HostessEntryGate() {
             return () => { active = false; };
         }
         setBusy(true);
+        setWaitCount(0);
+        // Тихая попытка: если бэк уже знает этот Telegram (привязка была
+        // раньше) — сразу входим. Иначе НЕ ошибка, а фаза ожидания:
+        // мини-апп ждёт, пока из бэка придут данные (кто это, какой номер).
         telegramAuth(initData)
             .then((res) => {
                 if (!active) return;
                 if (res && res.needsPhoneLink) {
-                    // Этот Telegram ни к кому не привязан — СРАЗУ предлагаем
-                    // поделиться номером (одна лёгкая регистрация), а не экран ошибки:
-                    // номер из бота подберётся через pending_contact (живёт 24ч).
                     setError('');
-                    setPhase('tg');
+                    setPhase('waiting');
                 } else if (res && res.role === 'GUEST') {
                     setPhase('guest');
                 }
                 // Иначе user в контексте — дальше AppNavigator сам.
             })
             .catch(() => {
+                // Сеть/бэк недоступны прямо сейчас — тоже ждём, а не сдаёмся.
                 if (active) {
-                    setError('Не удалось войти. Проверьте интернет и откройте смену заново из бота.');
-                    setPhase('error');
+                    setError('');
+                    setPhase('waiting');
                 }
             })
             .finally(() => { if (active) setBusy(false); });
         return () => { active = false; };
     }, [initData, isTelegramEnv, attempt]);
+
+    // Фаза waiting: опрос login, пока бэк не отдаст данные пользователя.
+    // Поделился номером в чате бота хоть когда (кэш живёт сутки) — подхватим.
+    useEffect(() => {
+        if (phase !== 'waiting') return undefined;
+        let active = true;
+        let timer = null;
+        let n = 0;
+        const tick = async () => {
+            if (!active) return;
+            n += 1;
+            if (active) setWaitCount(n);
+            try {
+                const res = await telegramAuth(initData);
+                if (!active) return;
+                if (res && !res.needsPhoneLink && res.role !== 'GUEST') {
+                    // Вошли — user в контексте, AppNavigator увезёт дальше сам.
+                    return;
+                }
+                if (res && res.role === 'GUEST') {
+                    setPhase('guest');
+                    return;
+                }
+            } catch {
+                // Ошибку сети глотаем — продолжаем ждать.
+            }
+            if (!active) return;
+            if (n >= WAIT_MAX_TRIES) {
+                setError('Бот так и не прислал данные за полторы минуты. Поделитесь номером ещё раз или войдите по паролю.');
+                setPhase('error');
+                return;
+            }
+            timer = setTimeout(tick, WAIT_GAP_MS);
+        };
+        timer = setTimeout(tick, 1500);
+        return () => { active = false; if (timer) clearTimeout(timer); };
+    }, [phase, initData]);
+
+    // Кнопка «Проверить сейчас»: мгновенный опрос без ожидания таймера.
+    const checkNow = async () => {
+        if (busy) return;
+        setBusy(true);
+        try {
+            const res = await telegramAuth(initData);
+            if (res && !res.needsPhoneLink && res.role !== 'GUEST') return;
+            if (res && res.role === 'GUEST') { setPhase('guest'); return; }
+            setWaitCount((c) => c + 1);
+        } catch {
+            setWaitCount((c) => c + 1);
+        } finally {
+            setBusy(false);
+        }
+    };
+
+    // Кто ждёт: имя/username берём из initDataUnsafe (есть БЕЗ бэкенда),
+    // номер и роль — только из бэка, их и ждём.
+    const waitingIdentity = () => {
+        const name = [telegramUser?.first_name, telegramUser?.last_name].filter(Boolean).join(' ');
+        if (name) return name + (telegramUser?.username ? ` (@${telegramUser.username})` : '');
+        if (telegramUser?.username) return `@${telegramUser.username}`;
+        return 'Telegram-пользователь';
+    };
 
 
     const submitCredentials = async () => {
@@ -170,8 +240,10 @@ export default function HostessEntryGate() {
                 }
             }
             if (res && (res.needsPhoneLink || res.role === 'GUEST')) {
-                setError('Этот Telegram не привязан к персоналу. Войдите по номеру и паролю ниже.');
-                setPhase('error');
+                // Бэк ещё не отдал данные (вебхук в пути) — уходим в ожидание,
+                // мини-апп продолжит опрашивать сама.
+                setError('');
+                setPhase('waiting');
             } else if (!res) {
                 const msg = lastErr?.response?.data?.error || lastErr?.response?.data?.message || '';
                 setError(msg || 'Не получилось войти через Telegram. Войдите по номеру и паролю ниже.');
@@ -254,6 +326,34 @@ export default function HostessEntryGate() {
                             <>
                                 <ActivityIndicator size="large" color={COLORS.primary} />
                                 <Text style={styles.hint}>Входим…</Text>
+                            </>
+                        )}
+
+                        {phase === 'waiting' && (
+                            <>
+                                <ActivityIndicator size="large" color={COLORS.telegram} />
+                                <Text style={styles.formTitle}>Ждём данные из бэкенда…</Text>
+                                <Text style={styles.hint}>
+                                    {waitingIdentity()} — сейчас запросим у сервера, кто это и какой у него номер.
+                                    Поделитесь номером здесь или в чате work-бота (подходит в течение суток).
+                                </Text>
+                                <Text style={styles.waitCounter}>Проверка {waitCount} · до ~90 сек</Text>
+                                {gradientBtn('Проверить сейчас', checkNow)}
+                                <TouchableOpacity
+                                    style={styles.loginBtn}
+                                    onPress={submitTelegram}
+                                    disabled={busy}
+                                >
+                                    <MaterialIcons name="telegram" size={18} color={COLORS.telegram} />
+                                    <Text style={[styles.loginBtnText, { color: COLORS.telegram }]}>Поделиться номером</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                    style={styles.loginBtn}
+                                    onPress={() => { setError(''); setPassword(''); setPhase('credentials'); }}
+                                >
+                                    <MaterialIcons name="phone" size={18} color={COLORS.textMuted} />
+                                    <Text style={styles.loginBtnText}>Войти по номеру и паролю</Text>
+                                </TouchableOpacity>
                             </>
                         )}
 
@@ -602,5 +702,11 @@ const styles = StyleSheet.create({
         fontSize: 11,
         color: COLORS.textMuted,
         textAlign: 'center',
+    },
+    waitCounter: {
+        fontSize: 12,
+        color: COLORS.telegram,
+        textAlign: 'center',
+        fontWeight: '700',
     },
 });

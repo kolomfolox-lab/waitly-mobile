@@ -48,24 +48,25 @@ beforeEach(() => {
   mockTelegramEnv.current = true;
 });
 
-test('hostess entry unlinked telegram goes straight to share-number', async () => {
+test('hostess entry unlinked telegram waits for backend data', async () => {
   mockTelegramAuth.mockResolvedValue({ needsPhoneLink: true, initData: 'x' });
   const view = renderScreen(Screen, { initialParams: {} });
   await flush();
   expect(mockTelegramAuth).toHaveBeenCalledWith('test-init-data');
-  // Одна лёгкая регистрация: сразу фаза шаринга, без экрана-ошибки.
-  expect(view.getByText('Вход через Telegram')).toBeTruthy();
+  // Мини-апп ждёт данные из бэка (кто это, какой номер), а не сдаётся.
+  expect(view.getByText('Ждём данные из бэкенда…')).toBeTruthy();
   expect(view.getByText('Поделиться номером')).toBeTruthy();
+  expect(view.getByText('Проверить сейчас')).toBeTruthy();
   expect(view.getByText('Войти по номеру и паролю')).toBeTruthy();
 });
 
-test('hostess entry shows error when login throws', async () => {
+test('hostess entry shows waiting (not error) when login throws', async () => {
   mockTelegramAuth.mockRejectedValue(new Error('bad'));
   const view = renderScreen(Screen, { initialParams: {} });
   await flush();
-  expect(view.getByText(/Не удалось войти/)).toBeTruthy();
+  expect(view.getByText('Ждём данные из бэкенда…')).toBeTruthy();
   expect(view.getByText('Войти по номеру и паролю')).toBeTruthy();
-  expect(view.getByText('Продолжить с Telegram')).toBeTruthy();
+  expect(view.getByText('Проверить сейчас')).toBeTruthy();
 });
 
 test('hostess entry opens invite registration from credentials', async () => {
@@ -89,10 +90,8 @@ test('hostess entry Telegram share logs in', async () => {
   mockRequestContact.mockResolvedValue(true);
   const view = renderScreen(Screen, { initialParams: {} });
   await flush();
-  await act(async () => {
-    fireEvent.press(view.getByText('Продолжить с Telegram'));
-  });
-  await flush();
+  // Сразу фаза ожидания — жмём шаринг без промежуточного экрана-ошибки.
+  expect(view.getByText('Ждём данные из бэкенда…')).toBeTruthy();
   await act(async () => {
     fireEvent.press(view.getByText('Поделиться номером'));
   });
@@ -108,10 +107,6 @@ test('hostess entry share declined falls back to error with password path', asyn
   const view = renderScreen(Screen, { initialParams: {} });
   await flush();
   await act(async () => {
-    fireEvent.press(view.getByText('Продолжить с Telegram'));
-  });
-  await flush();
-  await act(async () => {
     fireEvent.press(view.getByText('Поделиться номером'));
   });
   await flush();
@@ -119,13 +114,14 @@ test('hostess entry share declined falls back to error with password path', asyn
   expect(view.getByText('Войти по номеру и паролю')).toBeTruthy();
 });
 
-test('error inside Telegram hides open-bot button', async () => {
+test('waiting inside Telegram hides open-bot button', async () => {
   mockTelegramAuth.mockRejectedValue(new Error('bad'));
   const view = renderScreen(Screen, { initialParams: {} });
   await flush();
-  expect(view.getByText('Telegram без данных')).toBeTruthy();
+  expect(view.getByText('Ждём данные из бэкенда…')).toBeTruthy();
   expect(view.queryByText('Открыть work-бота')).toBeNull();
   expect(view.getByText('Войти по номеру и паролю')).toBeTruthy();
+  expect(view.getByText('Проверить сейчас')).toBeTruthy();
 });
 
 test('error outside Telegram shows open-bot button', async () => {
