@@ -48,12 +48,14 @@ beforeEach(() => {
   mockTelegramEnv.current = true;
 });
 
-test('hostess entry unlinked telegram goes to error with password path', async () => {
+test('hostess entry unlinked telegram goes straight to share-number', async () => {
   mockTelegramAuth.mockResolvedValue({ needsPhoneLink: true, initData: 'x' });
   const view = renderScreen(Screen, { initialParams: {} });
   await flush();
   expect(mockTelegramAuth).toHaveBeenCalledWith('test-init-data');
-  expect(view.getByText(/не привязан ни к одному аккаунту/)).toBeTruthy();
+  // Одна лёгкая регистрация: сразу фаза шаринга, без экрана-ошибки.
+  expect(view.getByText('Вход через Telegram')).toBeTruthy();
+  expect(view.getByText('Поделиться номером')).toBeTruthy();
   expect(view.getByText('Войти по номеру и паролю')).toBeTruthy();
 });
 
