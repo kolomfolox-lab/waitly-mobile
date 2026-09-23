@@ -3,7 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet, FlatList, Alert, Modal, Scrol
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import api from '../services/api';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import Storage from '../src/utils/storage';
 
 export default function DashboardScreen({ navigation }) {
     const [user, setUser] = useState(null);
@@ -18,7 +18,7 @@ export default function DashboardScreen({ navigation }) {
     }, []);
 
     const loadUser = async () => {
-        const userData = await AsyncStorage.getItem('user');
+        const userData = await Storage.getItem('user');
         if (userData) {
             setUser(JSON.parse(userData));
         }
@@ -35,7 +35,7 @@ export default function DashboardScreen({ navigation }) {
     };
 
     const handleLogout = async () => {
-        await AsyncStorage.multiRemove(['access_token', 'refresh_token', 'user']);
+        await Storage.multiRemove(['access_token', 'refresh_token', 'user']);
         navigation.replace('Login');
     };
 

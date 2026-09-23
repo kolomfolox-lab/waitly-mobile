@@ -1,13 +1,12 @@
 import axios from 'axios';
 import Storage from '../utils/storage';
-
-const API_HOST = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://localhost:8000';
-const API_BASE = `${API_HOST}/api/coffee`;
+import { ensureApiBase } from '../api/baseUrl';
 
 const getClient = async () => {
   const token = await Storage.getItem('access_token');
+  const base = await ensureApiBase();
   return axios.create({
-    baseURL: API_BASE,
+    baseURL: `${base}/api/coffee`,
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
     timeout: 10000,
   });

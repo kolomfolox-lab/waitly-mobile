@@ -1,11 +1,8 @@
 import axios from 'axios';
 import Storage from '../utils/storage';
-import Constants from 'expo-constants';
-
-const API_URL = process.env.EXPO_PUBLIC_API_BASE_URL || Constants.expoConfig?.extra?.apiUrl || 'https://api.waitly.uz/api/v1';
+import { ensureApiBase } from './baseUrl';
 
 const client = axios.create({
-    baseURL: API_URL,
     timeout: 15000,
     headers: {
         'Content-Type': 'application/json',
@@ -17,6 +14,8 @@ const clearAuthStorage = async () => {
 };
 
 client.interceptors.request.use(async (config) => {
+    const base = await ensureApiBase();
+    config.baseURL = `${base}/api/v1`;
     const token = await Storage.getItem('auth_access_token');
     if (token) {
         config.headers.Authorization = `Bearer ${token}`;
@@ -39,7 +38,8 @@ client.interceptors.response.use(
                     return Promise.reject(error);
                 }
 
-                const refreshResponse = await axios.post(`${API_URL}/auth/refresh/`, {
+                const base = await ensureApiBase();
+                const refreshResponse = await axios.post(`${base}/api/v1/auth/refresh/`, {
                     refresh: refreshToken,
                 });
 

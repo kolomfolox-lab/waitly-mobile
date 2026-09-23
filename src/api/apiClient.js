@@ -1,11 +1,8 @@
 import axios from 'axios';
 import Storage from '../utils/storage';
-import Constants from 'expo-constants';
-
-const API_BASE_URL = Constants.expoConfig?.extra?.apiUrl || 'https://api.waitly.uz';
+import { ensureApiBase } from './baseUrl';
 
 const apiClient = axios.create({
-    baseURL: API_BASE_URL,
     timeout: 15000,
     headers: {
         'Content-Type': 'application/json',
@@ -14,6 +11,8 @@ const apiClient = axios.create({
 
 apiClient.interceptors.request.use(
     async (config) => {
+        const base = await ensureApiBase();
+        config.baseURL = base;
         try {
             const token = await Storage.getItem('auth_access_token');
             if (token) {
@@ -34,7 +33,8 @@ apiClient.interceptors.response.use(
             try {
                 const refreshToken = await Storage.getItem('auth_refresh_token');
                 if (refreshToken) {
-                    const refreshResponse = await axios.post(`${API_BASE_URL}/api/auth/refresh/`, {
+                    const base = await ensureApiBase();
+                    const refreshResponse = await axios.post(`${base}/api/auth/refresh/`, {
                         refresh: refreshToken,
                     });
                     const { access, refresh } = refreshResponse.data;

@@ -1,0 +1,97 @@
+{
+  "mobile-menu": [
+    {
+      "name": "Плов",
+      "price": 45000,
+      "category": "Горячее"
+    },
+    {
+      "name": "Шашлык",
+      "price": 55000,
+      "category": "Горячее"
+    },
+    {
+      "name": "Мохито",
+      "price": 18000,
+      "category": "Напитки"
+    }
+  ],
+  "mobile-orders": [
+    {
+      "id": "c2683a63-055a-4518-aa7a-f485bed2f930",
+      "table": "1",
+      "status": "pending",
+      "total": 85000
+    },
+    {
+      "id": "253cb709-b9b4-4385-b8f9-45f3b9d7fde1",
+      "table": "2",
+      "status": "pending",
+      "total": 90000
+    },
+    {
+      "id": "6d8dcd2b-f66e-423e-a6b2-ef89e886255d",
+      "table": "3",
+      "status": "pending",
+      "total": 95000
+    },
+    {
+      "id": "3dd025b4-c7a5-4e05-a8d3-acd920388174",
+      "table": "4",
+      "status": "pending",
+      "total": 100000
+    },
+    {
+      "id": "c13b9c07-2aac-4981-a2fc-5260097730eb",
+      "table": "1",
+      "status": "pending",
+      "total": 105000
+    }
+  ],
+  "mobile-tables": [
+    {
+      "number": "1",
+      "capacity": 4,
+      "is_occupied": false
+    },
+    {
+      "number": "2",
+      "capacity": 4,
+      "is_occupied": false
+    },
+    {
+      "number": "3",
+      "capacity": 4,
+      "is_occupied": true
+    },
+    {
+      "number": "4",
+      "capacity": 4,
+      "is_occupied": false
+    },
+    {
+      "number": "5",
+      "capacity": 4,
+      "is_occupied": false
+    },
+    {
+      "number": "6",
+      "capacity": 4,
+      "is_occupied": true
+    },
+    {
+      "number": "7",
+      "capacity": 4,
+      "is_occupied": false
+    },
+    {
+      "number": "8",
+      "capacity": 4,
+      "is_occupied": false
+    }
+  ],
+  "expo-twa": {
+    "telegram": true,
+    "theme": "light"
+  }
+}

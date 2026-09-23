@@ -93,7 +93,7 @@ function BillModal({ visible, onClose, tableNumber, billData }) {
                             billData.payment_url ? (
                                 <View style={styles.qrSection}>
                                     <Image
-                                        source={{ uri: `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(billData.payment_url)}` }}
+                                        source={{ uri: `${apiClient.defaults.baseURL}/api/v1/mobile/payment-qr/?transaction_id=${encodeURIComponent(billData.transaction_id)}` }}
                                         style={styles.qrImage}
                                     />
                                     <Text style={styles.qrHint}>Гость сканирует QR для оплаты</Text>

@@ -20,6 +20,11 @@ const secureStorage = {
       try { await SecureStore.deleteItemAsync(KEY_PREFIX + key); } catch {}
     }
   },
+  multiSet: async (pairs) => {
+    for (const [key, value] of pairs) {
+      try { await SecureStore.setItemAsync(KEY_PREFIX + key, value); } catch {}
+    }
+  },
 };
 
 const webStorage = {
@@ -34,6 +39,9 @@ const webStorage = {
   },
   multiRemove: async (keys) => {
     try { keys.forEach(k => sessionStorage.removeItem(KEY_PREFIX + k)); } catch {}
+  },
+  multiSet: async (pairs) => {
+    try { pairs.forEach(([k, v]) => sessionStorage.setItem(KEY_PREFIX + k, v)); } catch {}
   },
 };
 

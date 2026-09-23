@@ -2,6 +2,7 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useR
 import Storage from '../utils/storage';
 import { Alert } from 'react-native';
 import { getOrders, getTables } from '../api/apiService';
+import { getHostessToday } from '../api/hostess';
 import { useAuth } from './AuthContext';
 
 const NotificationsContext = createContext();
@@ -14,6 +15,7 @@ const STORAGE_KEYS = {
 const DEFAULT_SETTINGS = {
     orderReady: true,
     waiterCalls: true,
+    bookingSeated: true,
     inAppAlerts: true,
 };
 
@@ -47,6 +49,34 @@ const buildOrderReadyNotifications = (orders, settings) => {
                 orderId: order.id,
                 tableId: order.table,
                 tableNumber: order.table_number,
+            },
+        }));
+};
+
+const BOOKING_SEATED_WINDOW_MS = 60 * 60 * 1000;
+
+export const buildBookingSeatedNotifications = (bookings, settings) => {
+    if (!settings.bookingSeated || !Array.isArray(bookings)) {
+        return [];
+    }
+    const now = Date.now();
+    return bookings
+        .filter((b) => {
+            if (b?.status !== 'SEATED') return false;
+            const ts = getNotificationTimestamp(b.updated_at);
+            return ts && now - ts <= BOOKING_SEATED_WINDOW_MS;
+        })
+        .map((b) => ({
+            id: `booking-seated-${b.id}-${b.updated_at || b.status}`,
+            type: 'BOOKING_SEATED',
+            title: 'Гость по брони пришёл',
+            message: `${b.client_name || 'Гость'} — стол ${b.table_number || '?'}, ${b.guest_count || ''} гост.`,
+            createdAt: b.updated_at || null,
+            entityId: b.id,
+            meta: {
+                bookingId: b.id,
+                tableId: b.table,
+                tableNumber: b.table_number,
             },
         }));
 };
@@ -153,17 +183,20 @@ export function NotificationsProvider({ children }) {
         }
 
         try {
-            const [ordersData, tablesData] = await Promise.all([
+            const [ordersData, tablesData, bookingsData] = await Promise.all([
                 getOrders().catch(() => ({ results: [] })),
                 getTables().catch(() => ({ results: [] })),
+                getHostessToday().catch(() => []),
             ]);
 
             const orders = ordersData?.results || ordersData || [];
             const tables = tablesData?.results || tablesData || [];
+            const bookings = Array.isArray(bookingsData) ? bookingsData : [];
 
             const freshNotifications = [
                 ...buildOrderReadyNotifications(orders, settings),
                 ...buildWaiterCallNotifications(tables, user, settings),
+                ...buildBookingSeatedNotifications(bookings, settings),
             ]
                 .map((item) => ({ ...item, read: false }))
                 .sort((a, b) => getNotificationTimestamp(b.createdAt) - getNotificationTimestamp(a.createdAt));

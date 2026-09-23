@@ -36,14 +36,20 @@ export const AuthProvider = ({ children }) => {
 
     const loadStorageData = async () => {
         try {
-            await Storage.multiRemove([
-                'auth_access_token',
-                'auth_refresh_token',
-                'user_role',
-                'user_data',
-            ]);
+            const token = await Storage.getItem('auth_access_token');
+            const raw = await Storage.getItem('user_data');
+            if (token && raw) {
+                try {
+                    const userData = await getMe();
+                    await applyUserData(userData);
+                } catch {
+                    const parsed = JSON.parse(raw);
+                    setUser(parsed);
+                    setRole(parsed.role);
+                }
+            }
         } catch (e) {
-            console.log('Failed to clear auth data:', e);
+            console.log('Failed to restore auth:', e);
         } finally {
             setLoading(false);
         }
@@ -62,7 +68,7 @@ export const AuthProvider = ({ children }) => {
 
             const userData = await getMe();
             await applyUserData(userData);
-            return true;
+            return userData;
         } catch (error) {
             console.error('Login failed:', error.response?.data || error.message);
             throw error;
@@ -86,7 +92,7 @@ export const AuthProvider = ({ children }) => {
 
             const userData = await getMe();
             await applyUserData(userData);
-            return true;
+            return userData;
         } catch (error) {
             console.error('Telegram login failed:', error.response?.data || error.message);
             throw error;
@@ -106,7 +112,7 @@ export const AuthProvider = ({ children }) => {
 
             const userData = await getMe();
             await applyUserData(userData);
-            return true;
+            return userData;
         } catch (error) {
             console.error('Telegram link failed:', error.response?.data || error.message);
             throw error;
@@ -118,6 +124,7 @@ export const AuthProvider = ({ children }) => {
         await applyUserData(userData);
         return userData;
     };
+
 
     const logout = async () => {
         await clearStorage();

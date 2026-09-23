@@ -15,6 +15,8 @@ import { useAuth } from '../../context/AuthContext';
 import { useNotifications } from '../../context/NotificationsContext';
 import { useKitchen } from '../../context/KitchenContext';
 import { getMe } from '../../api/apiService';
+import { requestWorkBotLink } from '../../api/hostess';
+import { openTelegramLink } from '../../telegram/openLink';
 import UserAvatar from '../../components/common/UserAvatar';
 import {
     AVATAR_PRESETS,
@@ -51,6 +53,7 @@ export default function ProfileScreen({ navigation }) {
     const [profile, setProfile] = useState(null);
     const [avatarPresetId, setAvatarPresetId] = useState(null);
     const [avatarModalVisible, setAvatarModalVisible] = useState(false);
+    const [workBotBusy, setWorkBotBusy] = useState(false);
     const fadeAnim = useRef(new Animated.Value(0)).current;
 
     useEffect(() => {
@@ -116,7 +119,7 @@ export default function ProfileScreen({ navigation }) {
                             await client.post('/auth/delete-account/');
                             Alert.alert('Аккаунт удалён', 'Вы будете перенаправлены на экран входа.');
                             logout();
-                        } catch (e) {
+                        } catch {
                             Alert.alert('Ошибка', 'Не удалось удалить аккаунт. Попробуйте позже.');
                         }
                     },
@@ -138,6 +141,32 @@ export default function ProfileScreen({ navigation }) {
     const handleMenuPress = (item) => {
         if (item.screen) {
             navigation.navigate(item.screen);
+        }
+    };
+
+    const canLinkWorkBot = ['WAITER', 'HEAD_WAITER', 'HOSTESS', 'SHIFT_LEADER', 'BARTENDER', 'MANAGER']
+        .includes(displayUser.role || user?.role);
+
+    const handleWorkBotLink = async () => {
+        if (workBotBusy) return;
+        setWorkBotBusy(true);
+        try {
+            const link = await requestWorkBotLink();
+            Alert.alert(
+                'Work-бот',
+                'Откройте ссылку и нажмите Start в боте — чат привяжется к вам.',
+                [
+                    { text: 'Позже', style: 'cancel' },
+                    { text: 'Открыть бота', onPress: () => link?.bot_url && openTelegramLink(link.bot_url) },
+                ],
+            );
+        } catch (e) {
+            Alert.alert(
+                'Не получилось',
+                e?.response?.data?.error || e?.response?.data?.message || 'Попробуйте позже',
+            );
+        } finally {
+            setWorkBotBusy(false);
         }
     };
 
@@ -223,6 +252,18 @@ export default function ProfileScreen({ navigation }) {
 
                 {/* Logout */}
                 <Animated.View style={{ opacity: fadeAnim }}>
+                    {canLinkWorkBot && (
+                        <TouchableOpacity
+                            style={[styles.logoutBtn, { borderColor: '#52D68150' }]}
+                            activeOpacity={0.7}
+                            onPress={handleWorkBotLink}
+                        >
+                            <MaterialIcons name="telegram" size={20} color="#52D681" />
+                            <Text style={[styles.logoutText, { color: '#52D681' }]}>
+                                {workBotBusy ? 'Создаю ссылку…' : 'Подключить work-бот'}
+                            </Text>
+                        </TouchableOpacity>
+                    )}
                     <TouchableOpacity
                         style={styles.logoutBtn}
                         activeOpacity={0.7}

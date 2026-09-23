@@ -1,13 +1,69 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  ActivityIndicator, SafeAreaView, Alert, RefreshControl
+  ActivityIndicator, SafeAreaView, Alert, RefreshControl, Modal, Image
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../../context/AuthContext';
 import { useTelegram } from '../../telegram/TelegramProvider';
 import api from '../../api/client';
+import { getBookingQrImage } from '../../api/hostess';
+
+const QR_REFRESH_MS = 150000;
+
+function BookingQrModal({ booking, onClose }) {
+  const [qrSrc, setQrSrc] = useState(null);
+  const [secondsLeft, setSecondsLeft] = useState(180);
+
+  const load = useCallback(async () => {
+    try {
+      const src = await getBookingQrImage(booking.id);
+      setQrSrc((prev) => {
+        if (typeof prev === 'string' && prev.startsWith('blob:')) URL.revokeObjectURL(prev);
+        return src;
+      });
+      setSecondsLeft(180);
+    } catch {
+      Alert.alert('Ошибка', 'Не удалось получить QR');
+      onClose();
+    }
+  }, [booking, onClose]);
+
+  useEffect(() => {
+    load();
+    const timer = setInterval(load, QR_REFRESH_MS);
+    const tick = setInterval(() => setSecondsLeft((s) => Math.max(0, s - 1)), 1000);
+    return () => {
+      clearInterval(timer);
+      clearInterval(tick);
+      setQrSrc((prev) => {
+        if (typeof prev === 'string' && prev.startsWith('blob:')) URL.revokeObjectURL(prev);
+        return null;
+      });
+    };
+  }, [load]);
+
+  return (
+    <Modal visible transparent animationType="slide">
+      <View style={styles.qrWrap}>
+        <View style={styles.qrModal}>
+          <Text style={styles.qrTitle}>Покажите хостес</Text>
+          <Text style={styles.qrSub}>Стол {booking.table_number} · {booking.booking_time}</Text>
+          {qrSrc ? (
+            <Image source={typeof qrSrc === 'string' ? { uri: qrSrc } : qrSrc} style={styles.qrImage} resizeMode="contain" />
+          ) : (
+            <ActivityIndicator size="large" color={COLORS.primary} style={{ marginVertical: 60 }} />
+          )}
+          <Text style={styles.qrTimer}>Обновится через {secondsLeft} с</Text>
+          <TouchableOpacity style={styles.bookNowBtn} onPress={onClose}>
+            <Text style={styles.bookNowText}>Закрыть</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  );
+}
 
 const COLORS = {
   primary: '#ff6b6b',
@@ -45,7 +101,7 @@ export default function MyBookingsScreen({ navigation }) {
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [phoneFilter, setPhoneFilter] = useState('');
+  const [phoneFilter] = useState('');
 
   const slug = user?.restaurant_slug;
   const telegramId = telegramUser?.id ? String(telegramUser.id) : null;
@@ -58,7 +114,7 @@ export default function MyBookingsScreen({ navigation }) {
 
       const response = await api.get(`/booking/${slug}/my/`, { params });
       setBookings(response.data.bookings || []);
-    } catch (err) {
+    } catch {
       Alert.alert('Ошибка', 'Не удалось загрузить брони');
     } finally {
       setLoading(false);
@@ -143,17 +199,26 @@ export default function MyBookingsScreen({ navigation }) {
           ) : null}
         </View>
         {(booking.status === 'PENDING' || booking.status === 'CONFIRMED') && (
-          <TouchableOpacity style={styles.cancelBtn} onPress={() => handleCancel(booking)}>
-            <MaterialIcons name="close" size={18} color={COLORS.red} />
-            <Text style={styles.cancelText}>Отменить</Text>
-          </TouchableOpacity>
+          <>
+            <TouchableOpacity style={styles.qrBtn} onPress={() => setQrBooking(booking)}>
+              <MaterialIcons name="qr-code-2" size={18} color={COLORS.primary} />
+              <Text style={styles.qrText}>QR для входа</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.cancelBtn} onPress={() => handleCancel(booking)}>
+              <MaterialIcons name="close" size={18} color={COLORS.red} />
+              <Text style={styles.cancelText}>Отменить</Text>
+            </TouchableOpacity>
+          </>
         )}
       </View>
     );
   };
 
+  const [qrBooking, setQrBooking] = useState(null);
+
   return (
     <SafeAreaView style={styles.container}>
+      {qrBooking && <BookingQrModal booking={qrBooking} onClose={() => setQrBooking(null)} />}
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
@@ -230,4 +295,15 @@ const styles = StyleSheet.create({
     marginTop: 14, paddingVertical: 10, borderRadius: 12, borderWidth: 1, borderColor: COLORS.red + '30',
   },
   cancelText: { fontSize: 14, fontWeight: '600', color: COLORS.red },
+  qrBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
+    marginTop: 14, paddingVertical: 10, borderRadius: 12, backgroundColor: COLORS.primary + '14',
+  },
+  qrText: { fontSize: 14, fontWeight: '700', color: COLORS.primary },
+  qrWrap: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: 32 },
+  qrModal: { backgroundColor: COLORS.white, borderRadius: 20, padding: 24, alignItems: 'center' },
+  qrTitle: { fontSize: 18, fontWeight: '700', color: COLORS.text },
+  qrSub: { fontSize: 14, color: COLORS.textMuted, marginTop: 4, marginBottom: 12 },
+  qrImage: { width: 220, height: 220 },
+  qrTimer: { fontSize: 13, color: COLORS.textMuted, marginTop: 10, marginBottom: 14 },
 });

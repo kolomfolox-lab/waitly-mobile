@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-    ActivityIndicator, Alert, Modal, RefreshControl, SafeAreaView,
+    ActivityIndicator, Alert, FlatList, Modal, RefreshControl, SafeAreaView,
     ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -27,7 +27,7 @@ export default function InventoryScreen() {
     const load = useCallback(async () => {
         try {
             const inv = await getMobileInventorySummary();
-            setItems(inv?.results || inv || []);
+            setItems(inv?.stock || inv?.results || []);
         } catch { /* silent */ }
         finally { setLoading(false); setRefreshing(false); }
     }, []);
@@ -52,7 +52,7 @@ export default function InventoryScreen() {
 
     const submitSupply = async (ingredientId, qty) => {
         try {
-            await client.post('/inventory/stock/incoming/', { ingredient_id: ingredientId, quantity: qty });
+            await client.post('/mobile/inventory/incoming/', { ingredient_id: ingredientId, quantity: qty });
             Alert.alert('Готово', 'Поставка добавлена');
             load();
         } catch {
@@ -63,7 +63,7 @@ export default function InventoryScreen() {
     const submitWriteOff = async () => {
         if (!writeOffModal) return;
         try {
-            await client.post('/api/v1/mobile/inventory/write-off/', {
+            await client.post('/mobile/inventory/write-off/', {
                 ingredient_id: writeOffModal.ingredient_id,
                 quantity: writeOffModal.quantity,
                 note: writeOffModal.note || '',
@@ -125,14 +125,14 @@ export default function InventoryScreen() {
                         <TouchableOpacity style={styles.item} onLongPress={() => {
                             if (!item.is_empty) setWriteOffModal({
                                 ingredient_id: item.ingredient_id,
-                                ingredient_name: item.ingredient_name,
+                                ingredient_name: item.name || item.ingredient_name,
                                 quantity: 0,
                                 note: '',
                             });
                         }}>
                             <MaterialIcons name={icon} size={20} color={color} />
                             <View style={{ flex: 1, marginLeft: 12 }}>
-                                <Text style={styles.itemName}>{item.ingredient_name}</Text>
+                                <Text style={styles.itemName}>{item.name || item.ingredient_name}</Text>
                                 <Text style={styles.itemMeta}>
                                     {item.quantity} {item.unit}
                                     {item.warehouse_name ? ` · ${item.warehouse_name}` : ''}
@@ -167,7 +167,7 @@ export default function InventoryScreen() {
                                         if (val && Number(val) > 0) submitSupply(item.ingredient_id, Number(val));
                                     }, 'plain-text', '1', 'decimal');
                                 }}>
-                                <Text style={styles.quickName}>{item.ingredient_name}</Text>
+                                <Text style={styles.quickName}>{item.name || item.ingredient_name}</Text>
                                 <Text style={styles.quickQty}>{item.quantity} {item.unit}</Text>
                             </TouchableOpacity>
                         ))}

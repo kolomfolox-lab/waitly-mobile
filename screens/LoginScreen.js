@@ -3,7 +3,7 @@ import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, KeyboardAvo
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import api from '../services/api';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import Storage from '../src/utils/storage';
 
 export default function LoginScreen({ navigation }) {
     const [phone, setPhone] = useState('');
@@ -26,7 +26,7 @@ export default function LoginScreen({ navigation }) {
 
             const { access, refresh, user } = response.data;
 
-            await AsyncStorage.multiSet([
+            await Storage.multiSet([
                 ['access_token', access],
                 ['refresh_token', refresh],
                 ['user', JSON.stringify(user)],

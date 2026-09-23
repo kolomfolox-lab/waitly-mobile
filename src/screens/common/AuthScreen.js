@@ -38,11 +38,18 @@ export default function AuthScreen({ navigation }) {
         }
         setLoading(true);
         try {
-            await login(phone.trim(), password);
+            const normalized = phone.trim().replace(/[^\d+]/g, '');
+            await login(normalized.startsWith('+') ? normalized : '+998' + normalized, password);
         } catch (e) {
-            const data = e?.response?.data;
-            const msg = data?.error?.message || data?.detail || data?.message || 'Неверный логин или пароль';
-            Alert.alert('Ошибка входа', msg);
+            if (!e?.response) {
+                Alert.alert('Ошибка сервера', 'Нет связи с сервером. Проверьте подключение к интернету.');
+            } else if (e.response.status === 401 || e.response.status === 400) {
+                const data = e?.response?.data;
+                const msg = data?.error?.message || data?.detail || data?.message || 'Неверный логин или пароль';
+                Alert.alert('Ошибка входа', msg);
+            } else {
+                Alert.alert('Ошибка сервера', `Сервер вернул ошибку (${e.response.status}). Попробуйте позже.`);
+            }
         } finally {
             setLoading(false);
         }

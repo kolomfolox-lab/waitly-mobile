@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { View, ActivityIndicator, Platform, StyleSheet } from 'react-native';
 import { NavigationContainer, getFocusedRouteNameFromRoute } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
@@ -57,6 +57,27 @@ import BaristaDashboard from '../screens/barista/BaristaDashboard';
 import CourierDashboard from '../screens/courier/CourierDashboard';
 import CourierOrderDetailsScreen from '../screens/courier/CourierOrderDetailsScreen';
 
+// Dispatcher
+import DispatcherDashboard from '../screens/dispatcher/DispatcherDashboard';
+
+// Support
+import SupportDashboard from '../screens/support/SupportDashboard';
+
+// Supplier
+import SupplierDashboard from '../screens/supplier/SupplierDashboard';
+
+// Auditor
+import AuditorDashboard from '../screens/auditor/AuditorDashboard';
+
+// Analyst
+import AnalystDashboard from '../screens/analyst/AnalystDashboard';
+
+// Accountant
+import AccountantDashboard from '../screens/accountant/AccountantDashboard';
+
+// Marketer
+import MarketerDashboard from '../screens/marketer/MarketerDashboard';
+
 // Owner
 import OwnerDashboard from '../screens/owner/OwnerDashboard';
 import StaffScreen from '../screens/owner/StaffScreen';
@@ -64,6 +85,14 @@ import OwnerMenuScreen from '../screens/owner/OwnerMenuScreen';
 import OwnerAIChatScreen from '../screens/owner/OwnerAIChatScreen';
 import PosScreen from '../screens/owner/PosScreen';
 import InventoryScreen from '../screens/InventoryScreen';
+
+// Hostess
+import HostessTodayScreen from '../screens/hostess/HostessTodayScreen';
+import HostessScanScreen from '../screens/hostess/HostessScanScreen';
+import HostessHallScreen from '../screens/hostess/HostessHallScreen';
+import HostessEntryGate from '../screens/hostess/HostessEntryGate';
+import HostessLinkScreen from '../screens/hostess/HostessLinkScreen';
+import { getWorkBotStatus } from '../api/hostess';
 
 // Chef
 import ChefDashboard from '../screens/chef/ChefDashboard';
@@ -101,6 +130,14 @@ const TAB_STYLE = {
 
 const LABEL_STYLE = { fontSize: 11, fontWeight: '600', marginTop: 2 };
 const TAB_ITEM_STYLE = { paddingTop: 2, marginHorizontal: 4, marginVertical: 4, borderRadius: 24 };
+// Вход через work-бот — для ВСЕХ ролей персонала (не только хостес).
+// Гостей (GUEST) сюда не пускаем — им гостевое приложение.
+const isStaffRoleForBotEntry = (role) => Boolean(role) && role !== 'GUEST';
+// Префиксы стартов смены: hostess_* (исторический) и staff_*.
+const isShiftStartParam = (value) => {
+    const s = String(value || '');
+    return s.startsWith('hostess') || s.startsWith('staff');
+};
 const HIDDEN_TAB_ROUTES = new Set([
     'OrderCreation',
     'OrderConfirmation',
@@ -279,6 +316,25 @@ function WaiterTabs() {
     );
 }
 
+function HostessTabs() {
+    const { t } = useTranslation();
+    return (
+        <Tab.Navigator
+            screenOptions={buildTabScreenOptions({
+                HostessTodayTab: 'event',
+                HostessScanTab: 'qr-code-scanner',
+                HostessHallTab: 'table-restaurant',
+                ProfileTab: 'person',
+            })}
+        >
+            <Tab.Screen name="HostessTodayTab" component={HostessTodayScreen} options={{ tabBarLabel: t('tab_today') }} />
+            <Tab.Screen name="HostessScanTab" component={HostessScanScreen} options={{ tabBarLabel: t('tab_scan') }} />
+            <Tab.Screen name="HostessHallTab" component={HostessHallScreen} options={{ tabBarLabel: t('tab_hall') }} />
+            <Tab.Screen name="ProfileTab" component={ProfileStack} options={{ tabBarLabel: t('tab_profile') }} />
+        </Tab.Navigator>
+    );
+}
+
 function ChecklistStack() {
     return (
         <Stack.Navigator screenOptions={{ headerShown: false }}>
@@ -427,6 +483,167 @@ function OwnerTabs() {
     );
 }
 
+function DispatcherDeliveryStack() {
+    return (
+        <Stack.Navigator screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="DispatcherHome" component={DispatcherDashboard} />
+        </Stack.Navigator>
+    );
+}
+
+function DispatcherTabs() {
+    const { t } = useTranslation();
+    return (
+        <Tab.Navigator
+            screenOptions={buildTabScreenOptions({
+                DispatcherTab: 'local-shipping',
+                ProfileTab: 'person',
+            })}
+        >
+            <Tab.Screen name="DispatcherTab" component={DispatcherDeliveryStack} options={{ tabBarLabel: 'Диспетчер' }} />
+            <Tab.Screen name="ProfileTab" component={ProfileStack} options={{ tabBarLabel: t('tab_profile') }} />
+        </Tab.Navigator>
+    );
+}
+
+function SupportStack() {
+    return (
+        <Stack.Navigator screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="SupportHome" component={SupportDashboard} />
+        </Stack.Navigator>
+    );
+}
+
+function SupportTabs() {
+    const { t } = useTranslation();
+    return (
+        <Tab.Navigator
+            screenOptions={buildTabScreenOptions({
+                SupportTab: 'support-agent',
+                ProfileTab: 'person',
+            })}
+        >
+            <Tab.Screen name="SupportTab" component={SupportStack} options={{ tabBarLabel: 'Поддержка' }} />
+            <Tab.Screen name="ProfileTab" component={ProfileStack} options={{ tabBarLabel: t('tab_profile') }} />
+        </Tab.Navigator>
+    );
+}
+
+function SupplierStack() {
+    return (
+        <Stack.Navigator screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="SupplierHome" component={SupplierDashboard} />
+        </Stack.Navigator>
+    );
+}
+
+function SupplierTabs() {
+    const { t } = useTranslation();
+    return (
+        <Tab.Navigator
+            screenOptions={buildTabScreenOptions({
+                SupplierTab: 'store',
+                ProfileTab: 'person',
+            })}
+        >
+            <Tab.Screen name="SupplierTab" component={SupplierStack} options={{ tabBarLabel: 'Поставки' }} />
+            <Tab.Screen name="ProfileTab" component={ProfileStack} options={{ tabBarLabel: t('tab_profile') }} />
+        </Tab.Navigator>
+    );
+}
+
+function AuditorStack() {
+    return (
+        <Stack.Navigator screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="AuditorHome" component={AuditorDashboard} />
+        </Stack.Navigator>
+    );
+}
+
+function AuditorTabs() {
+    const { t } = useTranslation();
+    return (
+        <Tab.Navigator
+            screenOptions={buildTabScreenOptions({
+                AuditorTab: 'verified-user',
+                ProfileTab: 'person',
+            })}
+        >
+            <Tab.Screen name="AuditorTab" component={AuditorStack} options={{ tabBarLabel: 'Аудит' }} />
+            <Tab.Screen name="ProfileTab" component={ProfileStack} options={{ tabBarLabel: t('tab_profile') }} />
+        </Tab.Navigator>
+    );
+}
+
+function AnalystStack() {
+    return (
+        <Stack.Navigator screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="AnalystHome" component={AnalystDashboard} />
+        </Stack.Navigator>
+    );
+}
+
+function AnalystTabs() {
+    const { t } = useTranslation();
+    return (
+        <Tab.Navigator
+            screenOptions={buildTabScreenOptions({
+                AnalystTab: 'insights',
+                ProfileTab: 'person',
+            })}
+        >
+            <Tab.Screen name="AnalystTab" component={AnalystStack} options={{ tabBarLabel: 'Аналитика' }} />
+            <Tab.Screen name="ProfileTab" component={ProfileStack} options={{ tabBarLabel: t('tab_profile') }} />
+        </Tab.Navigator>
+    );
+}
+
+function AccountantStack() {
+    return (
+        <Stack.Navigator screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="AccountantHome" component={AccountantDashboard} />
+        </Stack.Navigator>
+    );
+}
+
+function AccountantTabs() {
+    const { t } = useTranslation();
+    return (
+        <Tab.Navigator
+            screenOptions={buildTabScreenOptions({
+                AccountantTab: 'account-balance-wallet',
+                ProfileTab: 'person',
+            })}
+        >
+            <Tab.Screen name="AccountantTab" component={AccountantStack} options={{ tabBarLabel: 'Финансы' }} />
+            <Tab.Screen name="ProfileTab" component={ProfileStack} options={{ tabBarLabel: t('tab_profile') }} />
+        </Tab.Navigator>
+    );
+}
+
+function MarketerStack() {
+    return (
+        <Stack.Navigator screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="MarketerHome" component={MarketerDashboard} />
+        </Stack.Navigator>
+    );
+}
+
+function MarketerTabs() {
+    const { t } = useTranslation();
+    return (
+        <Tab.Navigator
+            screenOptions={buildTabScreenOptions({
+                MarketerTab: 'campaign',
+                ProfileTab: 'person',
+            })}
+        >
+            <Tab.Screen name="MarketerTab" component={MarketerStack} options={{ tabBarLabel: 'Маркетинг' }} />
+            <Tab.Screen name="ProfileTab" component={ProfileStack} options={{ tabBarLabel: t('tab_profile') }} />
+        </Tab.Navigator>
+    );
+}
+
 function getRoleComponent(role) {
     switch (role) {
         case 'CHEF':
@@ -435,8 +652,9 @@ function getRoleComponent(role) {
         case 'KITCHEN_MANAGER':
             return KitchenTabs;
         case 'COURIER':
-        case 'DISPATCHER':
             return CourierTabs;
+        case 'DISPATCHER':
+            return DispatcherTabs;
         case 'BARTENDER':
             return BartenderTabs;
         case 'BARISTA':
@@ -445,18 +663,25 @@ function getRoleComponent(role) {
         case 'CHAIN_OWNER':
         case 'SUPER_ADMIN':
         case 'MANAGER':
-        case 'ACCOUNTANT':
-        case 'MARKETER':
-        case 'ANALYST':
-        case 'SUPPORT':
-        case 'AUDITOR':
-        case 'SUPPLIER':
             return OwnerTabs;
+        case 'ACCOUNTANT':
+            return AccountantTabs;
+        case 'MARKETER':
+            return MarketerTabs;
+        case 'ANALYST':
+            return AnalystTabs;
+        case 'SUPPORT':
+            return SupportTabs;
+        case 'AUDITOR':
+            return AuditorTabs;
+        case 'SUPPLIER':
+            return SupplierTabs;
         case 'WAITER':
         case 'HEAD_WAITER':
-        case 'HOSTESS':
         case 'SHIFT_LEADER':
             return WaiterTabs;
+        case 'HOSTESS':
+            return HostessTabs;
         default:
             return null;
     }
@@ -464,11 +689,58 @@ function getRoleComponent(role) {
 
 export default function AppNavigator() {
     const { user, loading, subscriptionLock } = useAuth();
-    const { isReady: telegramReady } = useTelegram();
+    const { isReady: telegramReady, startParam, isTelegramEnv, showBackButton } = useTelegram();
+    const [wbLink, setWbLink] = useState(null);
+    // Telegram BackButton ↔ React Navigation: внутри TWA нативная кнопка
+    // «назад» дублирует стек навигации (Bot API BackButton).
+    const navRef = useRef(null);
+    const backCleanupRef = useRef(null);
+    const syncTelegramBack = () => {
+        try {
+            if (Platform.OS !== 'web' || !isTelegramEnv || typeof showBackButton !== 'function') return;
+            const canGoBack = !!(navRef.current && navRef.current.canGoBack && navRef.current.canGoBack());
+            if (backCleanupRef.current) {
+                try { backCleanupRef.current(); } catch { /* ignore */ }
+                backCleanupRef.current = null;
+            }
+            if (canGoBack) {
+                backCleanupRef.current = showBackButton(() => {
+                    try {
+                        if (navRef.current?.canGoBack?.()) navRef.current.goBack();
+                    } catch { /* ignore */ }
+                });
+            }
+        } catch { /* ignore */ }
+    };
+    useEffect(() => () => {
+        try { if (backCleanupRef.current) backCleanupRef.current(); } catch { /* ignore */ }
+    }, []);
 
     // The web build is the guest-facing Telegram mini app. Native builds keep
     // the existing staff and kitchen navigation below.
-    const isGuestWebApp = Platform.OS === 'web' && !user;
+    // Staff TWA entry: work-bot opens this build with startapp=hostess_*/staff_* —
+    // gate quietly logs in via initData, then role routing takes over.
+    // Это для ВСЕХ ролей: дальше каждый падает на свои табы по роли.
+    const cameFromStaffEntry =
+        Platform.OS === 'web' && isShiftStartParam(startParam);
+    const isHostessEntry = cameFromStaffEntry && !user;
+    const isGuestWebApp = Platform.OS === 'web' && !user && !isHostessEntry;
+
+    // Привязка work-бота — ВНУТРИ Web App: персонал, зашедший через
+    // кнопку «Открыть смену», видит экран подключения прямо в смене.
+    // Native-приложение не трогаем; при ошибке API — не блокируем.
+    useEffect(() => {
+        let active = true;
+        if (!cameFromStaffEntry || !user || !isStaffRoleForBotEntry(user.role)) {
+            if (active) setWbLink(null);
+            return () => { active = false; };
+        }
+        setWbLink((prev) => (prev === 'ok' ? prev : 'checking'));
+        getWorkBotStatus()
+            .then((st) => { if (active) setWbLink(st?.linked ? 'ok' : 'required'); })
+            .catch(() => { if (active) setWbLink('ok'); });
+        return () => { active = false; };
+    }, [cameFromStaffEntry, user]);
 
     if (loading || !telegramReady) {
         return (
@@ -482,11 +754,27 @@ export default function AppNavigator() {
         return <GuestWebApp />;
     }
 
+    if (isHostessEntry) {
+        return <HostessEntryGate />;
+    }
+
+    if (wbLink === 'checking') {
+        return (
+            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: COLORS.backgroundLight }}>
+                <ActivityIndicator size="large" color={COLORS.primary} />
+            </View>
+        );
+    }
+
+    if (wbLink === 'required') {
+        return <HostessLinkScreen onLinked={() => setWbLink('ok')} />;
+    }
+
     const MainComponent = user ? getRoleComponent(user.role) : null;
     const allowKitchenReadOnly = Boolean(user && ['CHEF', 'COOK', 'HEAD_CHEF', 'KITCHEN_MANAGER'].includes(user.role));
 
     return (
-        <NavigationContainer>
+        <NavigationContainer ref={navRef} onStateChange={syncTelegramBack} onReady={syncTelegramBack}>
             <Stack.Navigator screenOptions={{ headerShown: false }}>
                 {!user ? (
                     <>

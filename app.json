@@ -12,7 +12,8 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.waitlydeveloper.waitly-mobile"
     },
     "android": {
       "adaptiveIcon": {
@@ -34,7 +35,7 @@
       }
     },
     "extra": {
-      "apiUrl": "http://192.168.31.106:8000",
+      "apiUrl": "https://api.moonlauncher.org",
       "eas": {
         "projectId": "2412e9bc-ff38-4f36-954e-fa986cac7370"
       }
