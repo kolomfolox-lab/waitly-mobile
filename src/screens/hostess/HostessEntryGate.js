@@ -85,10 +85,11 @@ export default function HostessEntryGate() {
             .then((res) => {
                 if (!active) return;
                 if (res && res.needsPhoneLink) {
-                    // Этот Telegram ни к кому не привязан — ручного ввода
-                    // больше нет: вход по номеру+паролю или инвайту ниже.
-                    setError('Этот Telegram не привязан ни к одному аккаунту. Войдите по номеру и паролю или зарегистрируйтесь по инвайту.');
-                    setPhase('error');
+                    // Этот Telegram ни к кому не привязан — СРАЗУ предлагаем
+                    // поделиться номером (одна лёгкая регистрация), а не экран ошибки:
+                    // номер из бота подберётся через pending_contact (живёт 24ч).
+                    setError('');
+                    setPhase('tg');
                 } else if (res && res.role === 'GUEST') {
                     setPhase('guest');
                 }
@@ -316,7 +317,8 @@ export default function HostessEntryGate() {
                             <>
                                 <Text style={styles.formTitle}>Вход через Telegram</Text>
                                 <Text style={styles.hint}>
-                                    Поделитесь номером в Telegram — это нужно один раз для входа.
+                                    Поделитесь номером здесь или в чате work-бота — это нужно один раз для входа.
+                                    Номер из чата подходит в течение суток.
                                 </Text>
                                 <TouchableOpacity
                                     style={styles.telegramBtn}
