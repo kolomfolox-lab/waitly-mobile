@@ -27,13 +27,17 @@ const POLL_TIMEOUT = 20000;
 
 export default function LoginTelegramScreen({ navigation }) {
     const { telegramAuth } = useAuth();
-    const { initData, isTelegramEnv, WebApp } = useTelegram();
+    // ВАЖНО: провайдер не отдаёт сырой WebApp — только requestContact().
+    // Старый код читал несуществующий WebApp из контекста, и кнопка была мёртвой.
+    const { initData, isTelegramEnv, requestContact } = useTelegram();
     const [state, setState] = useState('idle');
     const [pollCount, setPollCount] = useState(0);
+    const [needsManualLink, setNeedsManualLink] = useState(false);
 
     const pollLogin = useCallback(async () => {
         setState('polling');
         setPollCount(0);
+        setNeedsManualLink(false);
         const start = Date.now();
 
         const tryLogin = async () => {
@@ -44,8 +48,12 @@ export default function LoginTelegramScreen({ navigation }) {
             }
             setPollCount(p => p + 1);
             try {
+                // telegramAuth возвращает userData (объект) при успехе
+                // или { needsPhoneLink: true }, если бот ещё не доставил контакт.
+                // Старый код ждал result === true — такого не бывает, и даже
+                // успешный вход выглядел таймаутом.
                 const result = await telegramAuth(initData);
-                if (result === true) {
+                if (result && !result.needsPhoneLink) {
                     setState('done');
                     return;
                 }
@@ -59,10 +67,10 @@ export default function LoginTelegramScreen({ navigation }) {
     }, [initData, telegramAuth]);
 
     const handleShareContact = async () => {
-        if (!WebApp || !isTelegramEnv) return;
+        if (!isTelegramEnv || typeof requestContact !== 'function') return;
         setState('requesting');
         try {
-            const shared = await WebApp.requestContact();
+            const shared = await requestContact();
             if (shared === true) {
                 await pollLogin();
             } else {
@@ -70,6 +78,14 @@ export default function LoginTelegramScreen({ navigation }) {
             }
         } catch (e) {
             setState('idle');
+        }
+    };
+
+    const goManualLink = () => {
+        try {
+            navigation.navigate('LinkPhone');
+        } catch {
+            setNeedsManualLink(true);
         }
     };
 
@@ -116,6 +132,13 @@ export default function LoginTelegramScreen({ navigation }) {
                                 <MaterialIcons name="refresh" size={20} color={COLORS.white} />
                                 <Text style={styles.retryBtnText}>Попробовать снова</Text>
                             </LinearGradient>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            style={[styles.retryBtn, styles.manualBtn]}
+                            onPress={goManualLink}
+                            activeOpacity={0.8}
+                        >
+                            <Text style={styles.manualBtnText}>Ввести номер вручную</Text>
                         </TouchableOpacity>
                     </View>
                 ) : null}
@@ -237,6 +260,18 @@ const styles = StyleSheet.create({
         color: COLORS.white,
         fontSize: 17,
         fontWeight: '700',
+    },
+    manualBtn: {
+        backgroundColor: '#f1f5f9',
+        shadowOpacity: 0,
+        elevation: 0,
+    },
+    manualBtnText: {
+        color: COLORS.textDark,
+        fontSize: 15,
+        fontWeight: '700',
+        textAlign: 'center',
+        paddingVertical: 16,
     },
     telegramBox: {
         gap: 16,

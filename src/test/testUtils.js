@@ -117,6 +117,7 @@ export function createTelegramProviderMock() {
       isTelegramEnv: false,
       startParam: '',
       WebApp: null,
+      requestContact: jest.fn(async () => false),
       setTelegramUser: jest.fn(),
       setInitData: jest.fn(),
     }),

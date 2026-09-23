@@ -565,7 +565,7 @@ async function persistAuthResponse(data) {
 
 export default function GuestWebApp() {
   const { width } = useWindowDimensions();
-  const { telegramUser, startParam, initData, isTelegramEnv } = useTelegram() || {};
+  const { telegramUser, startParam, initData, isTelegramEnv, requestContact: tgRequestContact } = useTelegram() || {};
   const [locale, setLocale] = useState('ru');
   const [verifiedMember, setVerifiedMember] = useState(false);
   const copy = { ...COPY[locale], premium: verifiedMember ? COPY[locale].verifiedMember : COPY[locale].member };
@@ -798,12 +798,21 @@ export default function GuestWebApp() {
     }
   };
 
-  const requestTelegramContact = () => {
+  // Нативный шаринг номера: requestContact возвращает только ФАКТ (boolean),
+  // сам номер уходит боту и подбирается через login/link-phone. Старый код ждал
+  // contact.phone_number в колбэке — такого API нет, кнопка была «заглушкой».
+  const requestTelegramContact = async () => {
     try {
-      const WebApp = require('@twa-dev/sdk').default;
-      WebApp.requestContact((contact) => {
-        if (contact?.phone_number) setRegistrationPhone(contact.phone_number);
-      });
+      if (typeof tgRequestContact !== 'function') {
+        setToast(copy.telegramPhonePlaceholder);
+        return;
+      }
+      const shared = await tgRequestContact();
+      if (shared === true) {
+        setToast('Номер отправлен боту. Теперь введите его ниже и нажмите «Подтвердить» — либо вход завершится сам через login.');
+      } else {
+        setToast(copy.telegramPhonePlaceholder);
+      }
     } catch {
       setToast(copy.telegramPhonePlaceholder);
     }
