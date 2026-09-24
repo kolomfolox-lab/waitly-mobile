@@ -28,20 +28,25 @@ const secureStorage = {
 };
 
 const webStorage = {
+  // localStorage, НЕ sessionStorage: вход один раз (регистрация),
+  // дальше месяцы тихих входов. sessionStorage умирал вместе с вкладкой
+  // мини-аппа — персонал вынужден был регаться КАЖДЫЙ ДЕНЬ.
+  // Refresh-токен живёт 30 дней (JWT_REFRESH_DAYS) и ротируется,
+  // кнопка «Выйти» чистит всё вручную.
   getItem: async (key) => {
-    try { return sessionStorage.getItem(KEY_PREFIX + key); } catch { return null; }
+    try { return localStorage.getItem(KEY_PREFIX + key); } catch { return null; }
   },
   setItem: async (key, value) => {
-    try { sessionStorage.setItem(KEY_PREFIX + key, value); } catch {}
+    try { localStorage.setItem(KEY_PREFIX + key, value); } catch {}
   },
   removeItem: async (key) => {
-    try { sessionStorage.removeItem(KEY_PREFIX + key); } catch {}
+    try { localStorage.removeItem(KEY_PREFIX + key); } catch {}
   },
   multiRemove: async (keys) => {
-    try { keys.forEach(k => sessionStorage.removeItem(KEY_PREFIX + k)); } catch {}
+    try { keys.forEach(k => localStorage.removeItem(KEY_PREFIX + k)); } catch {}
   },
   multiSet: async (pairs) => {
-    try { pairs.forEach(([k, v]) => sessionStorage.setItem(KEY_PREFIX + k, v)); } catch {}
+    try { pairs.forEach(([k, v]) => localStorage.setItem(KEY_PREFIX + k, v)); } catch {}
   },
 };
 
