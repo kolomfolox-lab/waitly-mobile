@@ -130,6 +130,18 @@ const TAB_STYLE = {
 
 const LABEL_STYLE = { fontSize: 11, fontWeight: '600', marginTop: 2 };
 const TAB_ITEM_STYLE = { paddingTop: 2, marginHorizontal: 4, marginVertical: 4, borderRadius: 24 };
+// Web: сплошной бар вместо стекла — backdrop-blur в браузере/TWA мажет
+// цвета контента под баром (розовые разводы) и выглядит багом.
+const WEB_TAB_STYLE = {
+    backgroundColor: '#ffffff',
+    borderTopWidth: 1,
+    borderTopColor: '#f0ecec',
+    height: 78,
+    paddingTop: 8,
+    paddingBottom: 14,
+    elevation: 0,
+};
+const WEB_TAB_ACTIVE_BG = 'rgba(255,107,107,0.12)';
 // Вход через work-бот — для ВСЕХ ролей персонала (не только хостес).
 // Гостей (GUEST) сюда не пускаем — им гостевое приложение.
 const isStaffRoleForBotEntry = (role) => Boolean(role) && role !== 'GUEST';
@@ -181,19 +193,23 @@ const getTabBarStyleForRoute = (route) => {
     return TAB_STYLE;
 };
 
-const buildTabScreenOptions = (icons) => ({ route }) => ({
-    headerShown: false,
-    tabBarIcon: ({ color }) => (
-        <MaterialIcons name={icons[route.name]} size={24} color={color} />
-    ),
-    tabBarActiveTintColor: COLORS.primary,
-    tabBarInactiveTintColor: COLORS.textMuted,
-    tabBarStyle: getTabBarStyleForRoute(route),
-    tabBarLabelStyle: LABEL_STYLE,
-    tabBarItemStyle: TAB_ITEM_STYLE,
-    tabBarBackground: () => <GlassTabBackground />,
-    tabBarActiveBackgroundColor: COLORS.glassActive,
-});
+const buildTabScreenOptions = (icons) => ({ route }) => {
+    const hidden = HIDDEN_TAB_ROUTES.has(getFocusedRouteNameFromRoute(route) || route.name);
+    const isWeb = Platform.OS === 'web';
+    return {
+        headerShown: false,
+        tabBarIcon: ({ color }) => (
+            <MaterialIcons name={icons[route.name]} size={24} color={color} />
+        ),
+        tabBarActiveTintColor: COLORS.primary,
+        tabBarInactiveTintColor: COLORS.textMuted,
+        tabBarStyle: hidden ? { display: 'none' } : (isWeb ? WEB_TAB_STYLE : getTabBarStyleForRoute(route)),
+        tabBarLabelStyle: LABEL_STYLE,
+        tabBarItemStyle: TAB_ITEM_STYLE,
+        tabBarBackground: isWeb ? undefined : () => <GlassTabBackground />,
+        tabBarActiveBackgroundColor: isWeb ? WEB_TAB_ACTIVE_BG : COLORS.glassActive,
+    };
+};
 
 function WaiterDashboardStack() {
     return (
