@@ -1,10 +1,12 @@
 /* global window, requestAnimationFrame, cancelAnimationFrame */
-import React, { useState, useRef, useEffect } from 'react';import {
+import React, { useState, useRef, useEffect, useCallback } from 'react';import {
     View, Text, StyleSheet, TouchableOpacity, TextInput,
-    ActivityIndicator, Platform,
+    ActivityIndicator, Platform, Animated, Easing, ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useFocusEffect } from '@react-navigation/native';
 import { resolveBookingQr, patchBooking, bookingArrived, bookingTurnover } from '../../api/hostess';
 import { alertDialog } from '../../utils/dialog';
 import { useTelegram } from '../../telegram/TelegramProvider';
@@ -42,6 +44,29 @@ export default function HostessScanScreen() {
     const streamRef = useRef(null);
     const detectorRef = useRef(null);
     const scannedRef = useRef(false);
+    const scanAnim = useRef(new Animated.Value(0)).current;
+
+    // Лазерная линия в рамке: бегает пока идёт сканирование.
+    useEffect(() => {
+        if (!scanning || found) return undefined;
+        const loop = Animated.loop(
+            Animated.sequence([
+                Animated.timing(scanAnim, { toValue: 1, duration: 1600, easing: Easing.linear, useNativeDriver: false }),
+                Animated.timing(scanAnim, { toValue: 0, duration: 1600, easing: Easing.linear, useNativeDriver: false }),
+            ]),
+        );
+        loop.start();
+        return () => loop.stop();
+    }, [scanning, found, scanAnim]);
+
+    // Возврат на вкладку — камера снова сама сканирует (без лишних тапов).
+    useFocusEffect(useCallback(() => {
+        if (!found) {
+            scannedRef.current = false;
+            setScanning(true);
+        }
+        return undefined;
+    }, [found]));
     // Нативный QR-сканер Telegram внутри TWA (Bot API 6.4 showScanQrPopup):
     // в WebView getUserMedia может быть недоступен — используем системный сканер.
     let tg = null;
@@ -116,6 +141,7 @@ export default function HostessScanScreen() {
             const booking = await resolveBookingQr(value);
             setFound(booking);
             setScanning(false);
+            try { tg?.haptic?.notification?.('success'); } catch { /* ignore */ }
             bookingTurnover(booking.id).then(setTurnover).catch(() => null);
         } catch (e) {
             const msg = e.response?.data?.error || 'QR недействителен';
@@ -213,26 +239,49 @@ export default function HostessScanScreen() {
         }
     };
 
+    const scanLineTop = scanAnim.interpolate({ inputRange: [0, 1], outputRange: [14, 204] });
+    const canShowCamera = Platform.OS === 'web' || (CameraView && permission?.granted);
+
     return (
         <SafeAreaView style={styles.safe}>
+            <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
             <Text style={styles.title}>Скан QR гостя</Text>
-            {tgCanScan && !found && (
-                <TouchableOpacity style={[styles.btn, styles.tgScanBtn]} onPress={scanViaTelegram} disabled={busy}>
-                    <Text style={styles.btnText}>📷 Сканировать через Telegram</Text>
-                </TouchableOpacity>
-            )}
+            <Text style={styles.subtitle}>
+                {found ? 'Данные гостя из брони' : 'Наведите камеру на QR — данные подтянутся сами'}
+            </Text>
             {!found ? (
                 <>
-                    <View style={styles.frame}>
-                        {Platform.OS === 'web' ? (
-                            <video ref={videoRef} style={{ width: '100%', height: 240, borderRadius: 16, backgroundColor: '#1e293b' }} muted playsInline />
-                        ) : CameraView && permission?.granted ? (
-                            <CameraView
-                                style={styles.camera}
-                                barcodeScannerEnabled
-                                onBarcodeScanned={onNativeBarcode}
-                                barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
-                            />
+                    <View style={styles.cameraBox}>
+                        {canShowCamera ? (
+                            <>
+                                {Platform.OS === 'web' ? (
+                                    <video ref={videoRef} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} muted playsInline />
+                                ) : (
+                                    <CameraView
+                                        style={StyleSheet.absoluteFill}
+                                        barcodeScannerEnabled
+                                        onBarcodeScanned={onNativeBarcode}
+                                        barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
+                                    />
+                                )}
+                                <View style={styles.overlay} pointerEvents="none">
+                                    <View style={styles.maskTop} />
+                                    <View style={styles.maskRow}>
+                                        <View style={styles.maskSide} />
+                                        <View style={styles.cutout}>
+                                            <View style={[styles.corner, styles.cornerTL]} />
+                                            <View style={[styles.corner, styles.cornerTR]} />
+                                            <View style={[styles.corner, styles.cornerBL]} />
+                                            <View style={[styles.corner, styles.cornerBR]} />
+                                            <Animated.View style={[styles.scanLine, { top: scanLineTop }]} />
+                                        </View>
+                                        <View style={styles.maskSide} />
+                                    </View>
+                                    <View style={styles.maskBottom}>
+                                        <Text style={styles.overlayHint}>QR гостя — в рамку</Text>
+                                    </View>
+                                </View>
+                            </>
                         ) : (
                             <View style={styles.noCam}>
                                 <MaterialIcons name="qr-code-scanner" size={56} color={COLORS.muted} />
@@ -244,11 +293,20 @@ export default function HostessScanScreen() {
                                 )}
                             </View>
                         )}
-                        {busy && <ActivityIndicator size="large" color={COLORS.primary} style={styles.loader} />}
+                        {busy && (
+                            <View style={styles.loaderWrap}>
+                                <ActivityIndicator size="large" color="#fff" />
+                            </View>
+                        )}
                     </View>
+                    {!!scanError && <Text style={styles.scanError}>{scanError}</Text>}
+                    {tgCanScan && (
+                        <TouchableOpacity style={[styles.btn, styles.tgScanBtn]} onPress={scanViaTelegram} disabled={busy}>
+                            <Text style={styles.btnText}>📷 Сканировать через Telegram</Text>
+                        </TouchableOpacity>
+                    )}
                     <View style={styles.manual}>
-                        <Text style={styles.manualTitle}>или вставьте код из QR</Text>
-                        {!!scanError && <Text style={styles.scanError}>{scanError}</Text>}
+                        <Text style={styles.manualTitle}>Нет камеры? Введите код</Text>
                         <TextInput
                             style={styles.input}
                             placeholder="WLY1.…"
@@ -268,69 +326,145 @@ export default function HostessScanScreen() {
                     </View>
                 </>
             ) : (
-                <View style={styles.card}>
-                    <Text style={styles.name}>{found.client_name}</Text>
-                    <Text style={styles.sub}>
-                        {found.client_phone_masked || found.client_phone}
-                        {found.low_trusted ? ' · ⚠️ low-trusted' : ''}
-                    </Text>
-                    <Text style={styles.meta}>
-                        Стол {found.table_number} · {(found.booking_time || '').slice(0, 5)} · {found.guest_count} гост.
-                        {found.arrived_count ? ` · пришло ${found.arrived_count}` : ''}
-                    </Text>
-                    {found.deposit_status === 'HOLD' && (
-                        <Text style={styles.dep}>💰 депозит {found.deposit_amount} (холд)</Text>
-                    )}
-                    {turnover && (
-                        <Text style={styles.sub}>
-                            {turnover.freeing_soon ? '⏳ стол скоро освобождается' : `Слот до ${turnover.ends_at.slice(11, 16)}`}
-                        </Text>
-                    )}
-                    <Text style={[styles.status, { color: found.status === 'SEATED' ? COLORS.success : COLORS.warning }]}>
-                        {found.status}
-                    </Text>
-                    <View style={styles.row}>
-                        <TouchableOpacity style={styles.btn} onPress={seat} disabled={busy}>
-                            <Text style={styles.btnText}>Посадить</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity style={[styles.btn, styles.btnGhost]} onPress={arrivedOne} disabled={busy}>
-                            <Text style={[styles.btnText, { color: COLORS.text }]}>+1 пришёл</Text>
-                        </TouchableOpacity>
-                    </View>
-                    <TouchableOpacity style={styles.close} onPress={reset}>
-                        <Text style={styles.closeText}>Следующий гость</Text>
-                    </TouchableOpacity>
-                </View>
+                <GuestCard
+                    found={found}
+                    turnover={turnover}
+                    busy={busy}
+                    onSeat={seat}
+                    onArrived={arrivedOne}
+                    onNext={reset}
+                />
             )}
+            </ScrollView>
         </SafeAreaView>
     );
 }
 
+function GuestCard({ found, turnover, busy, onSeat, onArrived, onNext }) {
+    const initial = ((found.client_name || 'Г').trim().slice(0, 1) || 'Г').toUpperCase();
+    const st = String(found.status || '');
+    const pill = st === 'SEATED'
+        ? { label: 'Сидит', fg: '#1d4ed8' }
+        : st === 'CONFIRMED'
+            ? { label: 'Подтверждена', fg: '#15803d' }
+            : st === 'PENDING'
+                ? { label: 'Ожидает', fg: '#92400e' }
+                : { label: st, fg: COLORS.muted };
+    const rows = [
+        { icon: 'event-seat', text: `Стол ${found.table_number}` },
+        { icon: 'access-time', text: `Сегодня · ${(found.booking_time || '').slice(0, 5)}` },
+        {
+            icon: 'people',
+            text: `${found.guest_count} гост.` + (found.arrived_count ? ` · пришло ${found.arrived_count}` : ''),
+        },
+    ];
+    if (found.deposit_status === 'HOLD') {
+        rows.push({ icon: 'payments', text: `Депозит ${found.deposit_amount} (холд)` });
+    }
+    if (turnover) {
+        rows.push({
+            icon: 'hourglass-empty',
+            text: turnover.freeing_soon ? 'Стол скоро освобождается' : `Слот до ${(turnover.ends_at || '').slice(11, 16)}`,
+        });
+    }
+    return (
+        <View style={styles.guestCard}>
+            <LinearGradient colors={['#ff6b6b', '#ff8a5c']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.guestHead}>
+                <View style={styles.avatar}>
+                    <Text style={styles.avatarText}>{initial}</Text>
+                </View>
+                <View style={styles.guestHeadMain}>
+                    <Text style={styles.guestName}>{found.client_name}</Text>
+                    <Text style={styles.guestPhone}>{found.client_phone_masked || found.client_phone}</Text>
+                </View>
+                <View style={styles.statusPill}>
+                    <Text style={[styles.statusPillText, { color: pill.fg }]}>{pill.label}</Text>
+                </View>
+            </LinearGradient>
+            <View style={styles.guestBody}>
+                {found.low_trusted && (
+                    <Text style={styles.lowTrusted}>⚠️ low-trusted гость — проверьте оплату</Text>
+                )}
+                {rows.map((r, i) => (
+                    <View key={i} style={styles.infoRow}>
+                        <MaterialIcons name={r.icon} size={18} color={COLORS.muted} />
+                        <Text style={styles.infoText}>{r.text}</Text>
+                    </View>
+                ))}
+                {!!found.occasion && <Text style={styles.note}>🎉 {found.occasion}</Text>}
+                {!!found.notes && <Text style={styles.note}>📝 {found.notes}</Text>}
+                <View style={styles.row}>
+                    <TouchableOpacity style={styles.seatBtn} onPress={onSeat} disabled={busy}>
+                        <Text style={styles.seatBtnText}>Посадить за стол {found.table_number}</Text>
+                    </TouchableOpacity>
+                </View>
+                <TouchableOpacity style={[styles.btn, styles.btnGhost]} onPress={onArrived} disabled={busy}>
+                    <Text style={[styles.btnText, { color: COLORS.text }]}>+1 пришёл</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.close} onPress={onNext}>
+                    <MaterialIcons name="refresh" size={16} color={COLORS.muted} />
+                    <Text style={styles.closeText}>Следующий гость</Text>
+                </TouchableOpacity>
+            </View>
+        </View>
+    );
+}
+
 const styles = StyleSheet.create({
-    safe: { flex: 1, backgroundColor: COLORS.background, padding: 16 },
-    title: { fontSize: 22, fontWeight: '800', color: '#fff', marginBottom: 12 },
-    frame: { borderRadius: 16, overflow: 'hidden', backgroundColor: '#1e293b', minHeight: 240, justifyContent: 'center' },
-    camera: { width: '100%', height: 280 },
-    noCam: { alignItems: 'center', paddingVertical: 48, gap: 10 },
+    safe: { flex: 1, backgroundColor: COLORS.background },
+    scroll: { padding: 16, paddingBottom: 32 },
+    title: { fontSize: 24, fontWeight: '800', color: '#fff' },
+    subtitle: { fontSize: 13, color: COLORS.muted, marginTop: 4, marginBottom: 14 },
+    // --- сканер ---
+    cameraBox: { height: 400, borderRadius: 24, overflow: 'hidden', backgroundColor: '#000' },
+    overlay: { ...StyleSheet.absoluteFillObject, alignItems: 'stretch' },
+    maskTop: { flex: 1, backgroundColor: 'rgba(2,6,23,0.62)' },
+    maskRow: { height: 230, flexDirection: 'row' },
+    maskSide: { flex: 1, backgroundColor: 'rgba(2,6,23,0.62)' },
+    maskBottom: { flex: 1, backgroundColor: 'rgba(2,6,23,0.62)', alignItems: 'center', justifyContent: 'flex-start', paddingTop: 14 },
+    cutout: { width: 230, height: 230 },
+    corner: { position: 'absolute', width: 30, height: 30, borderColor: '#fff' },
+    cornerTL: { top: 0, left: 0, borderTopWidth: 4, borderLeftWidth: 4, borderTopLeftRadius: 10 },
+    cornerTR: { top: 0, right: 0, borderTopWidth: 4, borderRightWidth: 4, borderTopRightRadius: 10 },
+    cornerBL: { bottom: 0, left: 0, borderBottomWidth: 4, borderLeftWidth: 4, borderBottomLeftRadius: 10 },
+    cornerBR: { bottom: 0, right: 0, borderBottomWidth: 4, borderRightWidth: 4, borderBottomRightRadius: 10 },
+    scanLine: {
+        position: 'absolute', left: 14, right: 14, height: 3, borderRadius: 2,
+        backgroundColor: '#4ade80',
+        shadowColor: '#4ade80', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.9, shadowRadius: 8,
+    },
+    overlayHint: { color: 'rgba(255,255,255,0.85)', fontSize: 13, fontWeight: '600' },
+    noCam: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 48, gap: 10, backgroundColor: '#1e293b' },
     hint: { color: COLORS.muted, textAlign: 'center', paddingHorizontal: 24 },
     camBtn: { backgroundColor: COLORS.primary, borderRadius: 999, paddingHorizontal: 18, paddingVertical: 10, marginTop: 8 },
     camBtnText: { color: '#fff', fontWeight: '700' },
-    loader: { position: 'absolute', alignSelf: 'center' },
-    manual: { backgroundColor: COLORS.card, borderRadius: 16, padding: 16, marginTop: 12 },
-    manualTitle: { fontWeight: '700', marginBottom: 8, color: COLORS.text },
-    scanError: { color: COLORS.danger, fontWeight: '700', fontSize: 13, marginBottom: 8 },
+    loaderWrap: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(2,6,23,0.45)' },
+    scanError: { color: '#fda4af', fontWeight: '700', fontSize: 13, marginTop: 10 },
+    tgScanBtn: { marginTop: 12, backgroundColor: '#229ED9' },
+    manual: { backgroundColor: COLORS.card, borderRadius: 20, padding: 16, marginTop: 12 },
+    manualTitle: { fontWeight: '800', marginBottom: 8, color: COLORS.text, fontSize: 15 },
     input: { backgroundColor: '#f1f5f9', borderRadius: 12, padding: 12, fontSize: 14, marginBottom: 10 },
     btn: { backgroundColor: COLORS.primary, borderRadius: 12, paddingVertical: 13, alignItems: 'center', flex: 1 },
-    tgScanBtn: { marginBottom: 12, backgroundColor: '#229ED9' },
     btnText: { color: '#fff', fontWeight: '800', fontSize: 15 },
     btnGhost: { backgroundColor: '#f1f5f9' },
-    card: { backgroundColor: COLORS.card, borderRadius: 16, padding: 18, marginTop: 4 },
-    name: { fontSize: 20, fontWeight: '800', color: COLORS.text },
-    sub: { fontSize: 14, color: COLORS.muted, marginTop: 4 },
-    meta: { fontSize: 15, color: COLORS.text, marginTop: 8 },
-    dep: { fontSize: 14, fontWeight: '700', color: COLORS.success, marginTop: 6 },
-    status: { fontWeight: '800', marginTop: 8 },
-    row: { flexDirection: 'row', gap: 8, marginTop: 14 },
-    close: { alignItems: 'center', paddingVertical: 12 },
-    closeText: { color: COLORS.muted, fontWeight: '700' },
+    row: { flexDirection: 'row', gap: 8, marginTop: 4 },
+    // --- карточка гостя ---
+    guestCard: { backgroundColor: COLORS.card, borderRadius: 24, overflow: 'hidden', marginTop: 4 },
+    guestHead: { flexDirection: 'row', alignItems: 'center', padding: 18, gap: 12 },
+    avatar: { width: 56, height: 56, borderRadius: 28, backgroundColor: 'rgba(255,255,255,0.25)', alignItems: 'center', justifyContent: 'center' },
+    avatarText: { color: '#fff', fontSize: 24, fontWeight: '900' },
+    guestHeadMain: { flex: 1 },
+    guestName: { color: '#fff', fontSize: 20, fontWeight: '900' },
+    guestPhone: { color: 'rgba(255,255,255,0.9)', fontSize: 14, marginTop: 2, fontWeight: '600' },
+    statusPill: { backgroundColor: '#fff', borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6 },
+    statusPillText: { fontSize: 12, fontWeight: '800' },
+    guestBody: { padding: 18, gap: 2 },
+    lowTrusted: { color: COLORS.danger, fontWeight: '700', fontSize: 13, marginBottom: 8 },
+    infoRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 7 },
+    infoText: { fontSize: 15, color: COLORS.text, fontWeight: '600' },
+    note: { fontSize: 13, color: COLORS.muted, marginTop: 6 },
+    seatBtn: { backgroundColor: COLORS.primary, borderRadius: 14, paddingVertical: 16, alignItems: 'center', flex: 1, marginTop: 12, shadowColor: COLORS.primary, shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.35, shadowRadius: 12, elevation: 6 },
+    seatBtnText: { color: '#fff', fontWeight: '900', fontSize: 17 },
+    close: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 14, gap: 6 },
+    closeText: { color: COLORS.muted, fontWeight: '700', fontSize: 14 },
 });
