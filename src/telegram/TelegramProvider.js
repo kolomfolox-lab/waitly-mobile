@@ -15,17 +15,15 @@ const TelegramContext = createContext(null);
 export const useTelegram = () => useContext(TelegramContext);
 
 function getWebApp() {
-  // Прямой инжект Telegram — первичен; @twa-dev/sdk — фолбэк.
+  // ТОЛЬКО настоящий инжект Telegram. Фолбэка на @twa-dev/sdk здесь
+  // намеренно нет: SDK вне Telegram отдаёт пустую заглушку, и провайдер
+  // начинал считать обычный браузер «телеграмом без данных» — мини-апп
+  // вечно опрашивала бэк с пустой подписью (401) вместо честного экрана
+  // «Откройте из Telegram».
   try {
     if (typeof window !== 'undefined' && window.Telegram?.WebApp) {
       return window.Telegram.WebApp;
     }
-  } catch {
-    // ignore
-  }
-  try {
-    const sdk = require('@twa-dev/sdk').default;
-    if (sdk && sdk.initDataUnsafe) return sdk;
   } catch {
     // ignore
   }
