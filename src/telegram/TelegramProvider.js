@@ -141,11 +141,32 @@ export function TelegramProvider({ children }) {
 
   // Поделиться номером через Telegram (кнопка входа): возвращает true,
   // если юзер подтвердил, иначе false. Вне Telegram — всегда false.
+  // ВАЖНО: настоящий WebApp.requestContact(callback) НИЧЕГО не возвращает —
+  // результат приходит ТОЛЬКО в колбэк (boolean) и событие contactRequested.
+  // Старый код делал await без колбэка и всегда получал false («поделиться
+  // номером не могу»). Плюс защита от двойного вызова (WebAppContactRequested).
   const requestContact = async () => {
     try {
       const WebApp = getWebApp();
       if (!WebApp || typeof WebApp.requestContact !== 'function') return false;
-      const shared = await WebApp.requestContact();
+      if (typeof WebApp.isVersionAtLeast === 'function' && !WebApp.isVersionAtLeast('6.9')) return false;
+      const shared = await new Promise((resolve) => {
+        let done = false;
+        const finish = (v) => {
+          if (done) return;
+          done = true;
+          try { WebApp.offEvent?.('contactRequested', onEvent); } catch { /* ignore */ }
+          resolve(v);
+        };
+        const onEvent = (e) => finish(e?.status === 'sent');
+        try { WebApp.onEvent?.('contactRequested', onEvent); } catch { /* ignore */ }
+        try {
+          WebApp.requestContact((ok) => finish(ok === true));
+        } catch {
+          finish(false);
+        }
+        setTimeout(() => finish(false), 60000);
+      });
       return shared === true;
     } catch {
       return false;
