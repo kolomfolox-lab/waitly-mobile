@@ -7,7 +7,6 @@ import {
     TextInput,
     SafeAreaView,
     ActivityIndicator,
-    Alert,
     KeyboardAvoidingView,
     Platform,
 } from 'react-native';
@@ -15,6 +14,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../../context/AuthContext';
 import { useTelegram } from '../../telegram/TelegramProvider';
+import { alertDialog } from '../../utils/dialog';
 
 const COLORS = {
     primary: '#ff6b6b',
@@ -32,7 +32,7 @@ export default function LinkPhoneScreen() {
 
     const handleLink = async () => {
         if (phone.length < 4) {
-            Alert.alert('Ошибка', 'Введите номер телефона');
+            await alertDialog('Ошибка', 'Введите номер телефона');
             return;
         }
 
@@ -43,7 +43,7 @@ export default function LinkPhoneScreen() {
             const msg = error.response?.data?.detail
                 || error.response?.data?.message
                 || 'Пользователь с таким номером не найден';
-            Alert.alert('Ошибка', msg);
+            await alertDialog('Ошибка', msg);
         } finally {
             setLoading(false);
         }

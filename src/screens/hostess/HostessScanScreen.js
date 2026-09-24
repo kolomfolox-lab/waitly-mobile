@@ -1,11 +1,12 @@
 /* global window, requestAnimationFrame, cancelAnimationFrame */
 import React, { useState, useRef, useEffect } from 'react';import {
     View, Text, StyleSheet, TouchableOpacity, TextInput,
-    Alert, ActivityIndicator, Platform,
+    ActivityIndicator, Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { resolveBookingQr, patchBooking, bookingArrived, bookingTurnover } from '../../api/hostess';
+import { alertDialog } from '../../utils/dialog';
 import { useTelegram } from '../../telegram/TelegramProvider';
 
 const COLORS = {
@@ -36,6 +37,7 @@ export default function HostessScanScreen() {
     const [found, setFound] = useState(null);
     const [turnover, setTurnover] = useState(null);
     const [scanning, setScanning] = useState(true);
+    const [scanError, setScanError] = useState('');
     const videoRef = useRef(null);
     const streamRef = useRef(null);
     const detectorRef = useRef(null);
@@ -49,9 +51,19 @@ export default function HostessScanScreen() {
     } catch { tg = null; }
     const tgCanScan = !!(tg?.isTelegramEnv && typeof tg?.canScanQr === 'function' && tg.canScanQr());
 
+    // Сканеры часто отдают текст с мусором (переносы строк, URL-обёртка) —
+    // вытаскиваем токен WLY1.<id>.<exp>.<sig>, иначе шлём как есть.
+    const extractToken = (raw) => {
+        const v = String(raw || '').trim();
+        if (!v) return '';
+        const m = v.match(/WLY1\.[A-Za-z0-9_-]+\.\d+\.[A-Za-z0-9_-]+/);
+        return m ? m[0] : v;
+    };
+
     const scanViaTelegram = async () => {
         if (!tg || !tgCanScan) return;
         try { tg.haptic?.selection?.(); } catch { /* ignore */ }
+        setScanError('');
         const text = await tg.scanQr();
         if (text && String(text).trim()) {
             scannedRef.current = true;
@@ -59,10 +71,47 @@ export default function HostessScanScreen() {
         }
     };
 
+    // Вставка из буфера: длинный токен вручную не набить, а камера
+    // в WebView/старом клиенте может отсутствовать вовсе.
+    const pasteFromClipboard = async () => {
+        setScanError('');
+        try {
+            const WebApp = typeof window !== 'undefined' ? window.Telegram?.WebApp : null;
+            if (WebApp && typeof WebApp.readTextFromClipboard === 'function') {
+                const text = await new Promise((resolveClip) => {
+                    let done = false;
+                    const finish = (v) => { if (!done) { done = true; resolveClip(v); } };
+                    try {
+                        WebApp.onEvent?.('clipboardTextReceived', (e) => finish(e?.data || ''));
+                    } catch { /* ignore */ }
+                    try {
+                        WebApp.readTextFromClipboard((t) => finish(typeof t === 'string' ? t : ''));
+                    } catch { finish(''); }
+                    setTimeout(() => finish(''), 8000);
+                });
+                if (text && text.trim()) {
+                    setToken(extractToken(text));
+                    return;
+                }
+            }
+            if (typeof navigator !== 'undefined' && navigator.clipboard?.readText) {
+                const text = await navigator.clipboard.readText();
+                if (text && text.trim()) {
+                    setToken(extractToken(text));
+                    return;
+                }
+            }
+            setScanError('Буфер пуст или недоступен — введите код вручную');
+        } catch {
+            setScanError('Не получилось прочитать буфер — введите код вручную');
+        }
+    };
+
     const resolve = async (raw) => {
-        const value = String(raw || '').trim();
+        const value = extractToken(raw);
         if (!value || busy) return;
         setBusy(true);
+        setScanError('');
         try {
             const booking = await resolveBookingQr(value);
             setFound(booking);
@@ -70,7 +119,8 @@ export default function HostessScanScreen() {
             bookingTurnover(booking.id).then(setTurnover).catch(() => null);
         } catch (e) {
             const msg = e.response?.data?.error || 'QR недействителен';
-            Alert.alert('Скан', msg);
+            setScanError(msg);
+            await alertDialog('Скан', msg);
             scannedRef.current = false;
         } finally {
             setBusy(false);
@@ -133,6 +183,7 @@ export default function HostessScanScreen() {
         setFound(null);
         setTurnover(null);
         setToken('');
+        setScanError('');
         scannedRef.current = false;
         setScanning(true);
     };
@@ -141,10 +192,10 @@ export default function HostessScanScreen() {
         setBusy(true);
         try {
             await patchBooking(found.id, { status: 'SEATED', arrived_count: found.guest_count });
-            Alert.alert('Готово', `Гость посажен за стол ${found.table_number}`);
+            await alertDialog('Готово', `Гость посажен за стол ${found.table_number}`);
             reset();
         } catch {
-            Alert.alert('Ошибка', 'Не удалось посадить');
+            await alertDialog('Ошибка', 'Не удалось посадить');
         } finally {
             setBusy(false);
         }
@@ -156,7 +207,7 @@ export default function HostessScanScreen() {
             const updated = await bookingArrived(found.id, 1);
             setFound(updated);
         } catch {
-            Alert.alert('Ошибка', 'Не удалось отметить прибытие');
+            await alertDialog('Ошибка', 'Не удалось отметить прибытие');
         } finally {
             setBusy(false);
         }
@@ -197,17 +248,23 @@ export default function HostessScanScreen() {
                     </View>
                     <View style={styles.manual}>
                         <Text style={styles.manualTitle}>или вставьте код из QR</Text>
+                        {!!scanError && <Text style={styles.scanError}>{scanError}</Text>}
                         <TextInput
                             style={styles.input}
                             placeholder="WLY1.…"
                             autoCapitalize="none"
                             autoCorrect={false}
                             value={token}
-                            onChangeText={setToken}
+                            onChangeText={(v) => { setToken(v); if (scanError) setScanError(''); }}
                         />
-                        <TouchableOpacity style={styles.btn} onPress={() => resolve(token)} disabled={busy || !token.trim()}>
-                            <Text style={styles.btnText}>Проверить</Text>
-                        </TouchableOpacity>
+                        <View style={styles.row}>
+                            <TouchableOpacity style={[styles.btn, styles.btnGhost]} onPress={pasteFromClipboard} disabled={busy}>
+                                <Text style={[styles.btnText, { color: COLORS.text }]}>Вставить</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity style={styles.btn} onPress={() => resolve(token)} disabled={busy || !token.trim()}>
+                                <Text style={styles.btnText}>Проверить</Text>
+                            </TouchableOpacity>
+                        </View>
                     </View>
                 </>
             ) : (
@@ -261,6 +318,7 @@ const styles = StyleSheet.create({
     loader: { position: 'absolute', alignSelf: 'center' },
     manual: { backgroundColor: COLORS.card, borderRadius: 16, padding: 16, marginTop: 12 },
     manualTitle: { fontWeight: '700', marginBottom: 8, color: COLORS.text },
+    scanError: { color: COLORS.danger, fontWeight: '700', fontSize: 13, marginBottom: 8 },
     input: { backgroundColor: '#f1f5f9', borderRadius: 12, padding: 12, fontSize: 14, marginBottom: 10 },
     btn: { backgroundColor: COLORS.primary, borderRadius: 12, paddingVertical: 13, alignItems: 'center', flex: 1 },
     tgScanBtn: { marginBottom: 12, backgroundColor: '#229ED9' },

@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import {
-    View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, Alert,
+    View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -45,7 +45,7 @@ export default function HostessHallScreen() {
             await markTableCleaned(table.id);
             load();
         } catch {
-            Alert.alert('Ошибка', 'Не удалось отметить уборку');
+            await alertDialog('Ошибка', 'Не удалось отметить уборку');
         }
     };
 

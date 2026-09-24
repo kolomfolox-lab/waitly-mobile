@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import {
-    View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Alert,
+    View, Text, StyleSheet, TouchableOpacity, ActivityIndicator,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { getWorkBotStatus, requestWorkBotLink } from '../../api/hostess';
 import { openTelegramLink } from '../../telegram/openLink';
+import { alertDialog } from '../../utils/dialog';
 
 /**
  * Привязка work-бота ВНУТРИ Web App: хостес жмёт «Подключить» прямо
@@ -24,10 +25,10 @@ export default function HostessLinkScreen({ onLinked }) {
             if (link?.bot_url) {
                 await openTelegramLink(link.bot_url);
             } else {
-                Alert.alert('Не получилось', 'Попробуйте позже');
+                await alertDialog('Не получилось', 'Попробуйте позже');
             }
         } catch (e) {
-            Alert.alert(
+            await alertDialog(
                 'Не получилось',
                 e?.response?.data?.error || e?.response?.data?.message || 'Попробуйте позже',
             );
@@ -45,13 +46,13 @@ export default function HostessLinkScreen({ onLinked }) {
             if (st?.linked) {
                 onLinked();
             } else {
-                Alert.alert(
+                await alertDialog(
                     'Ещё не привязано',
                     'Откройте чат бота, нажмите Start и вернитесь сюда.',
                 );
             }
         } catch {
-            Alert.alert('Не получилось', 'Нет связи с сервером');
+            await alertDialog('Не получилось', 'Нет связи с сервером');
         } finally {
             setBusy(false);
         }

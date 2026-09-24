@@ -51,7 +51,8 @@ export const getBookingQrImage = async (id) => {
 // ---------- Столы / уборка ----------
 export const getHostessTables = async () => {
     const { data } = await apiClient.get(`${BASE}/tables/`);
-    return data?.results || data || [];
+    const list = Array.isArray(data) ? data : data?.results;
+    return Array.isArray(list) ? list : [];
 };
 
 export const markTableCleaned = (id) =>
@@ -60,7 +61,8 @@ export const markTableCleaned = (id) =>
 // ---------- Очередь зала ----------
 export const getWaitlist = async () => {
     const { data } = await apiClient.get(`${BASE}/hall-waitlist/`);
-    return data?.results || data || [];
+    const list = Array.isArray(data) ? data : data?.results;
+    return Array.isArray(list) ? list : [];
 };
 
 export const addWaitlist = (payload) =>
@@ -80,7 +82,8 @@ export const getWorkBotStatus = () =>
 // ---------- Передача смены ----------
 export const getHandovers = async () => {
     const { data } = await apiClient.get(`${BASE}/handovers/`);
-    return data?.results || data || [];
+    const list = Array.isArray(data) ? data : data?.results;
+    return Array.isArray(list) ? list : [];
 };
 
 export const createHandover = (note = '') =>

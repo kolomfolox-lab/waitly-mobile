@@ -1,7 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import {
     View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput,
-    RefreshControl, Alert, Modal, ActivityIndicator,
+    RefreshControl, Modal, ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -12,6 +12,7 @@ import {
     getWaitlist, addWaitlist, callWaitlist, seatWaitlist, cancelWaitlist,
     getHandovers, createHandover, acceptHandover,
 } from '../../api/hostess';
+import { alertDialog, confirmDialog } from '../../utils/dialog';
 
 const COLORS = {
     primary: '#ff6b6b',
@@ -45,10 +46,10 @@ function BookingCard({ booking, onChanged }) {
         setBusy(true);
         try {
             await fn();
-            if (okMsg) Alert.alert('Готово', okMsg);
+            if (okMsg) await alertDialog('Готово', okMsg);
             onChanged();
         } catch (e) {
-            Alert.alert('Ошибка', e.response?.data?.error || e.response?.data?.detail || 'Не удалось');
+            await alertDialog('Ошибка', e.response?.data?.error || e.response?.data?.detail || 'Не удалось');
         } finally {
             setBusy(false);
         }
@@ -59,10 +60,12 @@ function BookingCard({ booking, onChanged }) {
         'Гость посажен',
     );
     const arrivedOne = () => run(() => bookingArrived(booking.id, 1));
-    const noShow = () => Alert.alert('Неявка?', 'Отметить гостя как не пришедшего?', [
-        { text: 'Нет', style: 'cancel' },
-        { text: 'Да', style: 'destructive', onPress: () => run(() => patchBooking(booking.id, { status: 'NO_SHOW' })) },
-    ]);
+    // В TWA Alert.alert — no-op (react-native-web), поэтому подтверждение
+    // через confirmDialog (нативный showPopup → window.confirm → Alert).
+    const noShow = async () => {
+        const ok = await confirmDialog('Неявка?', 'Отметить гостя как не пришедшего?', { okText: 'Да', destructive: true });
+        if (ok) run(() => patchBooking(booking.id, { status: 'NO_SHOW' }));
+    };
     const openSuggest = async () => {
         setBusy(true);
         try {
@@ -70,21 +73,17 @@ function BookingCard({ booking, onChanged }) {
             setSuggest(tables || []);
             setSuggestOpen(true);
         } catch {
-            Alert.alert('Ошибка', 'Нет свободных столов на замену');
+            await alertDialog('Ошибка', 'Нет свободных столов на замену');
         } finally {
             setBusy(false);
         }
     };
-    const moveTo = (table) => Alert.alert(`Пересадить на стол ${table.number}?`, '', [
-        { text: 'Нет', style: 'cancel' },
-        {
-            text: 'Пересадить',
-            onPress: () => {
-                setSuggestOpen(false);
-                run(() => patchBooking(booking.id, { table: table.id }), `Пересажено на стол ${table.number}`);
-            },
-        },
-    ]);
+    const moveTo = async (table) => {
+        const ok = await confirmDialog(`Пересадить на стол ${table.number}?`, '', { okText: 'Пересадить', cancelText: 'Нет' });
+        if (!ok) return;
+        setSuggestOpen(false);
+        run(() => patchBooking(booking.id, { table: table.id }), `Пересажено на стол ${table.number}`);
+    };
 
     const active = booking.status === 'PENDING' || booking.status === 'CONFIRMED';
     return (
@@ -173,7 +172,7 @@ function WaitlistPane({ onChanged, refreshKey }) {
             load();
             onChanged();
         } catch (e) {
-            Alert.alert('Ошибка', e.response?.data?.error || 'Не удалось');
+            await alertDialog('Ошибка', e.response?.data?.error || 'Не удалось');
         } finally {
             setBusy(false);
         }
@@ -181,7 +180,7 @@ function WaitlistPane({ onChanged, refreshKey }) {
 
     const add = () => {
         if (!name.trim() || !phone.trim()) {
-            Alert.alert('Заполните', 'Имя и телефон обязательны');
+            alertDialog('Заполните', 'Имя и телефон обязательны');
             return;
         }
         run(() => addWaitlist({ client_name: name.trim(), client_phone: phone.trim(), guest_count: Math.max(1, parseInt(guests, 10) || 2) }))
@@ -277,9 +276,9 @@ export default function HostessTodayScreen() {
             setHandoverNote('');
             setHandoverOpen(false);
             load();
-            Alert.alert('Готово', 'Смена передана');
+            await alertDialog('Готово', 'Смена передана');
         } catch {
-            Alert.alert('Ошибка', 'Не удалось передать смену');
+            await alertDialog('Ошибка', 'Не удалось передать смену');
         }
     };
 
@@ -303,10 +302,17 @@ export default function HostessTodayScreen() {
             {lastHandover && !lastHandover.accepted_by && (
                 <TouchableOpacity
                     style={styles.handoverBanner}
-                    onPress={() => Alert.alert('Принять смену?', lastHandover.note || 'Без заметки', [
-                        { text: 'Нет', style: 'cancel' },
-                        { text: 'Принять', onPress: async () => { await acceptHandover(lastHandover.id); load(); } },
-                    ])}
+                    onPress={async () => {
+                        const ok = await confirmDialog('Принять смену?', lastHandover.note || 'Без заметки', { okText: 'Принять', cancelText: 'Нет' });
+                        if (ok) {
+                            try {
+                                await acceptHandover(lastHandover.id);
+                            } catch {
+                                await alertDialog('Ошибка', 'Не удалось принять смену');
+                            }
+                            load();
+                        }
+                    }}
                 >
                     <Text style={styles.handoverBannerText}>📋 Непринятая передача смены — нажать чтобы принять</Text>
                 </TouchableOpacity>
