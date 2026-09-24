@@ -8,6 +8,7 @@ import * as NavigationBar from 'expo-navigation-bar';
 import { AuthProvider, useAuth } from './src/context/AuthContext';
 import { NotificationsProvider } from './src/context/NotificationsContext';
 import { TelegramProvider } from './src/telegram/TelegramProvider';
+import { injectWebTabCss } from './src/navigation/webTabCss';
 import AppNavigator from './src/navigation/AppNavigator';
 import i18n from './src/i18n';
 import { registerPushToken } from './src/api/apiService';
@@ -69,6 +70,11 @@ function PushRegistrar({ children }) {
 }
 
 export default function App() {
+  useEffect(() => {
+    // Убрать штатный синий фокус-квадрат с табов в веб/TWA (см. webTabCss).
+    if (Platform.OS === 'web') injectWebTabCss();
+  }, []);
+
   useEffect(() => {
     const restoreLanguage = async () => {
       try {
