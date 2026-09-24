@@ -44,7 +44,7 @@ const COLORS = {
  */
 export default function HostessEntryGate() {
     const { telegramAuth, login } = useAuth();
-    const { initData, isTelegramEnv, webAppVersion, tgPlatform, requestContact, telegramUser } = useTelegram() || {};
+    const { initData, isTelegramEnv, webAppVersion, tgPlatform, requestContact, telegramUser, readLiveInitData } = useTelegram() || {};
     const [phase, setPhase] = useState('login');
     const [error, setError] = useState('');
     const [phone, setPhone] = useState('+998');
@@ -57,6 +57,33 @@ export default function HostessEntryGate() {
     // Сколько ждём данных из бэка: ~90 секунд, дальше — честная ошибка.
     const WAIT_MAX_TRIES = 36;
     const WAIT_GAP_MS = 2500;
+
+    const liveInitData = () => {
+        try {
+            if (typeof readLiveInitData === 'function') return readLiveInitData() || '';
+        } catch { /* ignore */ }
+        return initData || '';
+    };
+
+    // Вернулся из чата бота (поделился номером) — перечитать подпись,
+    // данные могли появиться. Без этого аппа опрашивает со старой (пустой).
+    useEffect(() => {
+        if (Platform.OS !== 'web' || typeof window === 'undefined' || !window.addEventListener) return undefined;
+        const onVisible = () => {
+            try {
+                if (document.visibilityState !== 'visible') return;
+                const live = liveInitData();
+                if (live && (phase === 'waiting' || phase === 'nodata' || phase === 'error')) {
+                    setAttempt((a) => a + 1);
+                }
+            } catch { /* ignore */ }
+        };
+        document.addEventListener('visibilitychange', onVisible);
+        return () => {
+            try { document.removeEventListener('visibilitychange', onVisible); } catch { /* ignore */ }
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [phase]);
 
     /* ── анимация логотипа (как в LoginScreen) ── */
     const logoScale = useRef(new Animated.Value(0.5)).current;
@@ -79,10 +106,21 @@ export default function HostessEntryGate() {
 
     useEffect(() => {
         let active = true;
-        if (!isTelegramEnv || !initData) {
+        if (!isTelegramEnv) {
             if (active) {
                 setError('Откройте эту страницу из Telegram work-бота');
                 setPhase('error');
+            }
+            return () => { active = false; };
+        }
+        // Подпись может прийти позже холодного старта — читаем живьём.
+        // С пустой подписью опрашивать бессмысленно (вечные 401):
+        // показываем экран «нет данных» с кнопкой перезапуска.
+        const live = liveInitData();
+        if (!live) {
+            if (active) {
+                setError('');
+                setPhase('nodata');
             }
             return () => { active = false; };
         }
@@ -91,7 +129,7 @@ export default function HostessEntryGate() {
         // Тихая попытка: если бэк уже знает этот Telegram (привязка была
         // раньше) — сразу входим. Иначе НЕ ошибка, а фаза ожидания:
         // мини-апп ждёт, пока из бэка придут данные (кто это, какой номер).
-        telegramAuth(initData)
+        telegramAuth(live)
             .then((res) => {
                 if (!active) return;
                 if (res && res.needsPhoneLink) {
@@ -111,9 +149,10 @@ export default function HostessEntryGate() {
             })
             .finally(() => { if (active) setBusy(false); });
         return () => { active = false; };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [initData, isTelegramEnv, attempt]);
 
-    // Фаза waiting: опрос login, пока бэк не отдаст данные пользователя.
+    // Фаза waiting: опрос login ЖИВОЙ подписью, пока бэк не отдаст данные.
     // Поделился номером в чате бота хоть когда (кэш живёт сутки) — подхватим.
     useEffect(() => {
         if (phase !== 'waiting') return undefined;
@@ -122,10 +161,16 @@ export default function HostessEntryGate() {
         let n = 0;
         const tick = async () => {
             if (!active) return;
+            const live = liveInitData();
+            if (!live) {
+                // Подпись пропала/ещё нет — не жжём 401, ждём дальше.
+                timer = setTimeout(tick, WAIT_GAP_MS);
+                return;
+            }
             n += 1;
             if (active) setWaitCount(n);
             try {
-                const res = await telegramAuth(initData);
+                const res = await telegramAuth(live);
                 if (!active) return;
                 if (res && !res.needsPhoneLink && res.role !== 'GUEST') {
                     // Вошли — user в контексте, AppNavigator увезёт дальше сам.
@@ -148,6 +193,7 @@ export default function HostessEntryGate() {
         };
         timer = setTimeout(tick, 1500);
         return () => { active = false; if (timer) clearTimeout(timer); };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [phase, initData]);
 
     // Кнопка «Проверить сейчас»: мгновенный опрос без ожидания таймера.
@@ -155,7 +201,13 @@ export default function HostessEntryGate() {
         if (busy) return;
         setBusy(true);
         try {
-            const res = await telegramAuth(initData);
+            const live = liveInitData();
+            if (!live) {
+                setError('');
+                setPhase('nodata');
+                return;
+            }
+            const res = await telegramAuth(live);
             if (res && !res.needsPhoneLink && res.role !== 'GUEST') return;
             if (res && res.role === 'GUEST') { setPhase('guest'); return; }
             setWaitCount((c) => c + 1);
@@ -163,6 +215,17 @@ export default function HostessEntryGate() {
             setWaitCount((c) => c + 1);
         } finally {
             setBusy(false);
+        }
+    };
+
+    // Перезапуск смены из бота: даёт свежий запуск Mini App со свежей
+    // подписью (лечит пустую initData после кривого/кэшированного открытия).
+    const reopenShift = () => {
+        try {
+            openTelegramLink(WORK_BOT_URL);
+        } catch {
+            setError('Не получилось открыть бота. Откройте work-бота вручную и нажмите «Смена».');
+            setPhase('error');
         }
     };
 
@@ -231,7 +294,7 @@ export default function HostessEntryGate() {
             let lastErr = null;
             for (let i = 0; i < 5; i += 1) {
                 try {
-                    res = await telegramAuth(initData);
+                    res = await telegramAuth(liveInitData());
                     lastErr = null;
                     break;
                 } catch (e) {
@@ -326,6 +389,44 @@ export default function HostessEntryGate() {
                             <>
                                 <ActivityIndicator size="large" color={COLORS.primary} />
                                 <Text style={styles.hint}>Входим…</Text>
+                            </>
+                        )}
+
+                        {phase === 'nodata' && (
+                            <>
+                                <Text style={styles.formTitle}>Нет данных запуска</Text>
+                                <Text style={styles.hint}>
+                                    Telegram открыл смену, но не передал подпись (так бывает при кривом
+                                    открытии или старом кэше). Без неё войти нельзя — опросы бессмысленны,
+                                    поэтому мы их и не шлём.
+                                </Text>
+                                <TouchableOpacity
+                                    style={styles.telegramBtn}
+                                    onPress={reopenShift}
+                                    disabled={busy}
+                                    activeOpacity={0.8}
+                                >
+                                    <LinearGradient
+                                        colors={[COLORS.telegram, '#0099dd']}
+                                        start={{ x: 0, y: 0 }}
+                                        end={{ x: 1, y: 0 }}
+                                        style={styles.telegramBtnGradient}
+                                    >
+                                        <MaterialIcons name="refresh" size={24} color={COLORS.white} />
+                                        <Text style={styles.telegramBtnText}>Открыть смену заново</Text>
+                                    </LinearGradient>
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                    style={styles.loginBtn}
+                                    onPress={() => { setError(''); setPassword(''); setPhase('credentials'); }}
+                                >
+                                    <MaterialIcons name="phone" size={18} color={COLORS.textMuted} />
+                                    <Text style={styles.loginBtnText}>Войти по номеру и паролю</Text>
+                                </TouchableOpacity>
+                                <Text style={styles.debug}>
+                                    tg:{isTelegramEnv ? 'да' : 'нет'} · init:нет
+                                    {tgPlatform ? ` · ${tgPlatform}` : ''}{webAppVersion ? ` · v${webAppVersion}` : ''}
+                                </Text>
                             </>
                         )}
 

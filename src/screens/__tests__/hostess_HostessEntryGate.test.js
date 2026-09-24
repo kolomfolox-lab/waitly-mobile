@@ -6,7 +6,7 @@ const mockTelegramAuth = jest.fn();
 const mockTelegramLink = jest.fn();
 const mockRequestContact = jest.fn();
 const mockLogin = jest.fn();
-const mockTelegramEnv = { current: true };
+const mockTelegramEnv = { current: true, initData: 'test-init-data' };
 
 jest.mock('../../context/AuthContext', () => ({
   useAuth: () => ({
@@ -22,11 +22,12 @@ jest.mock('../../context/AuthContext', () => ({
 jest.mock('../../telegram/TelegramProvider', () => ({
   useTelegram: () => ({
     telegramUser: { id: 123 },
-    initData: 'test-init-data',
+    initData: mockTelegramEnv.initData,
     isTelegramEnv: mockTelegramEnv.current,
     isReady: true,
     startParam: 'hostess_today',
     requestContact: mockRequestContact,
+    readLiveInitData: () => mockTelegramEnv.initData,
   }),
 }));
 
@@ -46,6 +47,16 @@ beforeEach(() => {
   mockRequestContact.mockReset();
   mockLogin.mockReset();
   mockTelegramEnv.current = true;
+  mockTelegramEnv.initData = 'test-init-data';
+});
+
+test('hostess entry without initData shows nodata screen, never polls', async () => {
+  mockTelegramEnv.initData = '';
+  const view = renderScreen(Screen, { initialParams: {} });
+  await flush();
+  expect(mockTelegramAuth).not.toHaveBeenCalled();
+  expect(view.getByText('Нет данных запуска')).toBeTruthy();
+  expect(view.getByText('Открыть смену заново')).toBeTruthy();
 });
 
 test('hostess entry unlinked telegram waits for backend data', async () => {

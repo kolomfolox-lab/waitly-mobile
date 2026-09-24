@@ -1,5 +1,5 @@
 /* global window */
-import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
 import { Platform } from 'react-native';
 import Storage from '../utils/storage';
 import { readInitDataFromHash, readStartParamFromHash } from './initData';
@@ -115,6 +115,31 @@ export function TelegramProvider({ children }) {
   const [safeArea, setSafeArea] = useState(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [homeScreenStatus, setHomeScreenStatus] = useState(null);
+  const initDataRef = useRef('');
+  useEffect(() => { initDataRef.current = initData; }, [initData]);
+
+  // Живое перечитывание подписи: Telegram может отдать initData ПОЗЖЕ
+  // (холодный старт WebView, возврат из чата бота). Опрос с пустой подписью —
+  // это вечные 401, поэтому gate перед каждым poll берёт свежее значение
+  // отсюда, а не из замыкания. Возвращает актуальную initData (может быть '').
+  const readLiveInitData = useCallback(() => {
+    try {
+      if (typeof window === 'undefined') return initDataRef.current;
+      const WebApp = getWebApp();
+      const live = (WebApp && WebApp.initData) || readInitDataFromHash() || '';
+      if (live && live !== initDataRef.current) {
+        initDataRef.current = live;
+        setInitData(live);
+        try {
+          const u = WebApp?.initDataUnsafe?.user || null;
+          if (u) setTelegramUser(u);
+        } catch { /* ignore */ }
+      }
+      return live || initDataRef.current;
+    } catch {
+      return initDataRef.current;
+    }
+  }, []);
 
   // Поделиться номером через Telegram (кнопка входа): возвращает true,
   // если юзер подтвердил, иначе false. Вне Telegram — всегда false.
@@ -483,6 +508,7 @@ export function TelegramProvider({ children }) {
       requestContact,
       // --- полный Mini Apps API (no-op вне Telegram) ---
       haptic,
+      readLiveInitData,
       isVersionAtLeast,
       viewportHeight,
       safeArea,
